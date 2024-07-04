@@ -311,6 +311,8 @@
                             role: "model",
                             parts: [{ text: msg }],
                         });
+                        var chatBox = document.getElementById('chatHistory');
+                        chatBox.scrollTop = chatBox.scrollHeight;
                     } else {
                         throw new Error('Invalid response from API');
                     }
@@ -431,6 +433,8 @@
                 role: "user",
                 parts: [{ text: message }],
             });
+            var chatBox = document.getElementById('chatHistory');
+            chatBox.scrollTop = chatBox.scrollHeight;
 
             document.getElementById("messageInput").value = "";
             console.log("message:", message);
