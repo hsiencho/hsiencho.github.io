@@ -1,9 +1,9 @@
-# Gemini Chatbot https://hsiencho.github.io/Chat.html
+# Gemini Chatbot
 This is a chat web page using HTML and JavaScript, along with the Gemini API.
 
 *You can choose the profession (one option) and personality traits (multiple options) of the chatbot, and it will respond accordingly..*
 
-## How to use
+## How to use https://hsiencho.github.io/Chat.html
 **1. Choose the profession (one option)**
 * High School Student
 * College Student
