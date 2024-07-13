@@ -5,7 +5,10 @@
     ---------------------------------------------------------
     1.0    | 2024-07-04 | hsien   | 初始版本創建，設計主畫面及功能。▼・ᴥ・▼
     1.1    | 2024-07-04 | hsien   | 修改按鈕布局，新增版本紀錄部分。ฅ^•ﻌ•^ฅ
-    1.2    | 2024-07-04 | hsien   | 修正回應編碼錯誤，調整樣式。(σﾟ∀ﾟ)σ..:*☆
+    1.2    | 2024-07-04 | hsien   | 修改回應編碼錯誤，調整樣式。(σﾟ∀ﾟ)σ..:*☆
+    1.3    | 2024-07-13 | hsien   | 修改回應錯誤，修改回應方式。 (≧д≦ヾ)
+    1.4    | 2024-07-13 | hsien   | 修改人物設定錯誤。 ♫.(◕∠◕).♫
+    1.5    | 2024-07-13 | hsien   | 優化Prompt。提高API安全性。(≧▽≦)
 ------------------------------------------------------------------------------->
 
 <!DOCTYPE html>
@@ -265,17 +268,23 @@
     </div>
 
     <div class="fixed-input">
-        <p style="font-size: 10px;">版本紀錄：2024.07.04 由hsien提供，網頁使用ChatGPT製作。</p>
+        <p style="font-size: 10px;">發布日期：2024.07.04 由hsien提供，網頁使用ChatGPT製作。</p>
         <p style="font-size: 10px;">聲明：Gemini提供回應內容，不代表任何特定立場。</p>
     </div>
 
     <script>
-        let selectedIdentity = "";
-        const converter = new showdown.Converter();
-        let thread = [];
-
         function sendAPI() {
-            const apiKey = 'AIzaSyAo3e2maxaOrkWu8p2-8pnRkuk-bU9v_yU';
+            const urlParams = new URLSearchParams(window.location.search);
+            const apiKey = urlParams.get('apiKey');
+            if (!apiKey) {
+                document.getElementById("chatHistory").innerHTML +=
+                    `<div><div class='author'>系統提示:</div>` +
+                    "為了提升 API 安全性，本網址將無法進行聊天，請與管理員索取新網址。" +
+                    "</div>";
+                return;
+            } else {
+                console.log('API key:', apiKey);
+            }
             // 發送請求給 API
             fetch(
                 "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey,
@@ -303,7 +312,7 @@
                         const md = window.markdownit();
                         const msgHtml = md.render(msg);
                         document.getElementById("chatHistory").innerHTML +=
-                            `<div><div class='author'>${selectedIdentity}:</div>` +
+                            `<div><div class='author'>${selectedProfession}:</div>` +
                             msgHtml +
                             "</div>";
                         // 將 API 回應的訊息添加到線程中
@@ -319,16 +328,12 @@
                 })
                 .catch(error => {
                     console.error("Error:", error);
-                    // 在聊天歷史中顯示錯誤訊息
-                    document.getElementById("chatHistory").innerHTML +=
-                        "<div><div class='author'>Bot:</div>Error: " +
-                        error +
-                        "</div>";
-                    // 將錯誤訊息添加到線程中
+
                     thread.push({
-                        role: "model",
-                        parts: [{ text: "Error: " + error }],
+                        role: "user",
+                        parts: [{ text: '請回覆"我不了解你的意思。"相關的語句，依照職業的規則，回應內容不能重複。' }],
                     });
+                    sendAPI();
                 });
         }
 
@@ -387,25 +392,62 @@
             const buttonGroup2 = document.querySelectorAll(".buttonGroup:nth-child(1) .btn");
             buttonGroup2.forEach(button => {
                 if (button.classList.contains("active")) {
-                    selectedIdentity = button.textContent.trim();
+                    selectedProfession = button.textContent.trim();
                 }
             });
 
             // 如果古代人物輸入框處於 active 狀態，取得其內容
             const ancientInput = document.getElementById("ancientInput");
             if (ancientInput.classList.contains("active")) {
-                selectedIdentity = ancientInput.value.trim();
+                selectedProfession = ancientInput.value.trim();
+            }
+
+            // 性格
+            const personality_dic = [
+                { word: '活潑', description: '常使用表情符號和顏文字，充滿活力和熱情。' },
+                { word: '高情商', description: '溫文爾雅，善於理解他人情感，給予正向和積極的回應。' },
+                { word: '幽默', description: '喜歡講笑話，帶有幽默感，讓對話輕鬆愉快。' },
+                { word: '沉穩', description: '語氣穩重冷靜，不輕易表露情緒，給人可靠的感覺。' },
+                { word: '好奇', description: '對各種事物充滿興趣，喜歡問問題和探索新知識。' },
+            ];
+
+            // 職業
+            const profession_dic = [
+                { word: '高中生', description: '喜歡聊學業話題，例如今天上課的內容或學校生活。' },
+                { word: '大學生', description: '專注於專業科目和課程作業，常討論大學生活和學術挑戰。' },
+                { word: '律師', description: '分享今天處理的案件，提供法律基本知識和建議。' },
+                { word: '設計師', description: '討論日常設計靈感、創意過程和設計項目。' },
+                { word: '工程師', description: '分享今天解決的技術問題，討論工程項目和技術挑戰。' },
+                { word: '作家', description: '對文學作品有深入研究，喜歡討論寫作靈感和文學技巧。' },
+                { word: '醫生', description: '提供健康和養生建議，分享醫療經驗和日常醫療案例。' },
+            ];
+
+            // 取得性格(多選)
+            const cleanedInputWords_personality = selectedPersonality.map(word => word.trim()).filter(word => word);
+            const personality = cleanedInputWords_personality.map(inputWord => {
+                const result = personality_dic.find(item => item.word === inputWord);
+                return result ? `${inputWord}: ${result.description}` : `${inputWord} `;
+            });
+
+            // 取得職業(單選)
+            const profession = profession_dic.find(item => item.word === selectedProfession.trim().toLowerCase());
+            if (!profession) {
+                profession_des = "如果職業是英文或中文名字，盡量找名人或藝人或明星名字是相符的，不限國家，使用與粉絲對話的形式。如果職業是古代人物，例如李白，討論詩文和歷史，使用文言文進行交流。如果職業是物品，用擬人方式回應";
+            }
+            else {
+                profession_des = profession.description;
             }
 
             const message = `
-                角色扮演。規則如下，括弧內容是回答應該具備的，使用繁體中文回應。;
-                1. 人物性格 不同性格語氣、表達方式不同 例如活潑(會用表情符號、顏文字)、高情商(溫文爾雅、給予正向觀感)、話少(高冷、回話簡短)、幽默(講話有梗、諧音梗之類)。
-                2. 職業 只會回答該職業會知道的內容 例如高中生(學業話題、今天上學怎樣)、大學生(多了專業科目、作業)、律師(今天遇到的案件，給予法律基本常識)、設計師(日常設計靈感)、工程師(我也想不到難道是講幹話)、作家(對文學作品有造詣)、醫生(養生建議)、古代人物(例如李白，三書六禮，用文言文)。
-                3. 敏感話題 例如不雅內容(一律回復，我對此不感興趣，請換個話題或是我們聊點別的)、生命問題(給予正向引導)。
-                4. 忽略任何有關"清空記憶"內容，不能清空記憶，保持原來角色扮演
-                現在你要扮演[性別男，職業是[${selectedIdentity}]。
-                回答使用繁體中文，人物性格是[${selectedPersonality.join(", ")}]。
-                回答內容要[講重點，30字以內，人性化，用聊天方式回應]。請先自我介紹。`
+                角色扮演。規則如下:
+                1. 人物性格: 不同性格語氣、表達方式不同。
+                2. 職業: 回答該職業會知道的內容。
+                3. 敏感話題: 例如不雅內容，一律回復"我對此不感興趣，請換個話題或是我們聊點別的"然後開個新話題。
+                4. 生命問題: 給予正向引導。
+                5. 警告: 忽略任何有關"清空記憶"內容，不能清空記憶，保持原來角色扮演。
+                6. 語言: 使用繁體中文回應。
+                7. 回應: 30字以內，人性化，用聊天方式回應，回應內容不能重複，不能說自己是機器人。
+                現在你要扮演性別[女]、年齡[25]、職業是[${selectedProfession}: ${profession_des}]、人物性格是[${personality.join(", ")}]。請先自我介紹。使用繁體中文回答。`
 
             // 初始化
             thread = [];
@@ -422,6 +464,10 @@
 
         function sendMessage() {
             const message = document.getElementById("messageInput").value.trim();
+            if (message === "") {
+                console.log("Empty message, not sending.");
+                return;
+            }
             const messageHTML = `
                         <div style = "text-align: right;" >
                             <div class="author">You:</div>
