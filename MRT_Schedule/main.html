@@ -165,6 +165,12 @@
                         autoLocate(25.0635, 121.5117); // 預設大橋頭
                     }
                 },
+                // ★ 關鍵參數設定 ★
+                {
+                    enableHighAccuracy: false, // 不需要 GPS 精準度，Wi-Fi/基地台定位對捷運站夠用了
+                    timeout: 5000,             // 5秒
+                    maximumAge: Infinity       // ★重點：接受「無限久」以前的快取 (只要手機有紀錄就馬上給我)
+                }
             );
         } else {
             autoLocate(25.0635, 121.5117);
@@ -392,4 +398,5 @@
 </body>
 
 </html>
+
 
