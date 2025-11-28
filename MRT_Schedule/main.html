@@ -151,6 +151,9 @@
                 (err) => {
                     document.getElementById('status-text').innerText = "定位失敗，使用預設值";
                     autoLocate(25.0635, 121.5117);
+                },
+                {
+                    enableHighAccuracy: false;
                 }
             );
         } else {
@@ -377,4 +380,5 @@
 </script>
 
 </body>
+
 </html>
