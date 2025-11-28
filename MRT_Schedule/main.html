@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>捷運即時發車</title>
+    <script src="mrt_o_data.js"></script> 
+
+    <style>
+        :root {
+            --primary-color: #f8b61c;
+            --bg-color: #f5f5f5;
+            --card-bg: #ffffff;
+            --text-dark: #333;
+            --text-light: #666;
+            --status-red: #d32f2f;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: var(--bg-color); padding: 20px; color: var(--text-dark); margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        .header { background-color: var(--primary-color); color: white; padding: 16px; text-align: center; position: relative; }
+        .header h1 { margin: 0; font-size: 1.4rem; }
+        .day-badge { 
+            position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+            background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; border: 1px solid rgba(255,255,255,0.4);
+        }
+
+        .station-info { padding: 15px; text-align: center; border-bottom: 1px solid #eee; }
+        .station-name { font-size: 1.8rem; font-weight: bold; margin-top: 5px; }
+        .gps-status { font-size: 0.85rem; color: var(--text-light); }
+
+        .direction-buttons { display: flex; gap: 10px; padding: 15px; background: #fafafa; }
+        .btn { flex: 1; padding: 12px; border: none; border-radius: 8px; background: #e0e0e0; cursor: pointer; font-weight: bold; font-size: 1rem; color: #555; transition: 0.2s; }
+        .btn.active { background: #333; color: var(--primary-color); }
+        
+        .time-list { list-style: none; padding: 0; margin: 0; min-height: 100px; }
+        .time-item { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid #f0f0f0; }
+        
+        .dest-tag { font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; display: inline-block; }
+        .tag-huilong { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .tag-luzhou { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+        
+        .time-val { font-size: 1.3rem; font-weight: bold; font-family: monospace; letter-spacing: 1px; }
+        .time-status { font-weight: bold; font-size: 0.95rem; color: #333; }
+        .status-urgent { color: var(--status-red); }
+        
+        footer { text-align: center; margin-top: 20px; color: #999; font-size: 0.8rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header" id="ui-header">
+        <h1 id="ui-line-name">捷運時刻表</h1>
+        <div class="day-badge" id="day-type-badge">判斷中</div>
+    </div>
+
+    <div class="station-info">
+        <div class="station-name" id="ui-station-name">---</div>
+        <div class="gps-status" id="status-text">定位中...</div>
+    </div>
+
+    <div class="direction-buttons" id="btn-container"></div>
+
+    <ul class="time-list" id="timetable">
+        <li style="padding:20px; text-align:center; color:#999;">請選擇方向</li>
+    </ul>
+</div>
+
+<script>
+    // =========================================================
+    // 1. 設定檔 (Config) - 支援 weekday / weekend
+    // =========================================================
+    const METRO_CONFIG = {
+        "orange": {
+            name: "中和新蘆線",
+            color: "#f8b61c",
+            directions: [
+                { 
+                    id: "north", 
+                    label: "往 迴龍 / 蘆洲", 
+                    sources: {
+                        // 平日資料源
+                        weekday: ["MRT_DATA_HUILONG_WD", "MRT_DATA_LUZHOU_WD"],
+                        // 假日資料源
+                        weekend: ["MRT_DATA_HUILONG_WE", "MRT_DATA_LUZHOU_WE"]
+                    },
+                    excludeStations: ["迴龍", "蘆洲"]
+                },
+                { 
+                    id: "south", 
+                    label: "往 南勢角", 
+                    sources: {
+                        weekday: ["MRT_DATA_SOUTH_WD"],
+                        weekend: ["MRT_DATA_SOUTH_WE"]
+                    },
+                    excludeStations: ["南勢角"]
+                }
+            ],
+            stations: [
+                { name: "南勢角", id: "O01", lat: 24.9920, lon: 121.5090, branch: 'common' },
+                { name: "景安", id: "O02", lat: 24.9934, lon: 121.5050, branch: 'common' },
+                { name: "永安市場", id: "O03", lat: 25.0030, lon: 121.5113, branch: 'common' },
+                { name: "頂溪", id: "O04", lat: 25.0138, lon: 121.5153, branch: 'common' },
+                { name: "古亭", id: "O05", lat: 25.0263, lon: 121.5229, branch: 'common' },
+                { name: "東門", id: "O06", lat: 25.0338, lon: 121.5287, branch: 'common' },
+                { name: "忠孝新生", id: "O07", lat: 25.0423, lon: 121.5329, branch: 'common' },
+                { name: "松江南京", id: "O08", lat: 25.0518, lon: 121.5334, branch: 'common' },
+                { name: "行天宮", id: "O09", lat: 25.0599, lon: 121.5334, branch: 'common' },
+                { name: "中山國小", id: "O10", lat: 25.0635, lon: 121.5266, branch: 'common' },
+                { name: "民權西路", id: "O11", lat: 25.0620, lon: 121.5193, branch: 'common' },
+                { name: "大橋頭", id: "O12", lat: 25.0635, lon: 121.5117, branch: 'common' },
+                // 迴龍線
+                { name: "台北橋", id: "O13", lat: 25.0634, lon: 121.5034, branch: 'huilong' },
+                { name: "菜寮", id: "O14", lat: 25.0606, lon: 121.4927, branch: 'huilong' },
+                { name: "三重", id: "O15", lat: 25.0555, lon: 121.4837, branch: 'huilong' },
+                { name: "先嗇宮", id: "O16", lat: 25.0456, lon: 121.4722, branch: 'huilong' },
+                { name: "頭前庄", id: "O17", lat: 25.0401, lon: 121.4604, branch: 'huilong' },
+                { name: "新莊", id: "O18", lat: 25.0362, lon: 121.4524, branch: 'huilong' },
+                { name: "輔大", id: "O19", lat: 25.0326, lon: 121.4357, branch: 'huilong' },
+                { name: "丹鳳", id: "O20", lat: 25.0287, lon: 121.4223, branch: 'huilong' },
+                { name: "迴龍", id: "O21", lat: 25.0219, lon: 121.4111, branch: 'huilong' },
+                // 蘆洲線
+                { name: "三重國小", id: "O50", lat: 25.0702, lon: 121.4967, branch: 'luzhou' },
+                { name: "三和國中", id: "O51", lat: 25.0768, lon: 121.4864, branch: 'luzhou' },
+                { name: "徐匯中學", id: "O52", lat: 25.0809, lon: 121.4805, branch: 'luzhou' },
+                { name: "三民高中", id: "O53", lat: 25.0853, lon: 121.4724, branch: 'luzhou' },
+                { name: "蘆洲", id: "O54", lat: 25.0914, lon: 121.4645, branch: 'luzhou' }
+            ]
+        }
+    };
+
+    let appState = {
+        lineKey: 'orange',
+        station: null,
+        dirId: 'north',
+        dayType: 'weekday' // weekday or weekend
+    };
+
+    // ==========================================
+    // 2. 初始化與定位
+    // ==========================================
+    window.onload = function() {
+        checkDayType(); // 判斷日期
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    autoLocate(pos.coords.latitude, pos.coords.longitude);
+                },
+                (err) => {
+                    document.getElementById('status-text').innerText = "定位失敗，使用預設值";
+                    autoLocate(25.0635, 121.5117);
+                }
+            );
+        } else {
+            autoLocate(25.0635, 121.5117);
+        }
+    };
+
+    // 判斷平日或假日
+    function checkDayType() {
+        const today = new Date();
+        const day = today.getDay(); // 0=週日, 6=週六
+        
+        // 簡單判斷：週六日為假日
+        if (day === 0 || day === 6) {
+            appState.dayType = 'weekend';
+            document.getElementById('day-type-badge').innerText = "假日時刻";
+        } else {
+            appState.dayType = 'weekday';
+            document.getElementById('day-type-badge').innerText = "平日時刻";
+        }
+        
+        // 進階：如果需要特定國定假日，可在此處加入邏輯
+        // e.g. if (today.getMonth() === 0 && today.getDate() === 1) appState.dayType = 'weekend';
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; const dLat = (lat2-lat1)*Math.PI/180; const dLon = (lon2-lon1)*Math.PI/180;
+        const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    function autoLocate(lat, lon) {
+        let minD = Infinity;
+        let best = null;
+        let bestLine = 'orange';
+
+        for (const [lineKey, lineConfig] of Object.entries(METRO_CONFIG)) {
+            lineConfig.stations.forEach(st => {
+                const d = getDistance(lat, lon, st.lat, st.lon);
+                if (d < minD) { minD = d; best = st; bestLine = lineKey; }
+            });
+        }
+
+        appState.lineKey = bestLine;
+        appState.station = best;
+
+        const distKm = minD.toFixed(1);
+        const walkMin = Math.ceil(minD * 15);
+        const bikeMin = Math.ceil(minD * 3);
+        
+        document.getElementById('ui-station-name').innerText = best.name;
+        document.getElementById('status-text').innerHTML = 
+            `距離 ${distKm} km (步行約${walkMin}分 / 車程約${bikeMin}分)`;
+
+        const conf = METRO_CONFIG[bestLine];
+        document.getElementById('ui-header').style.backgroundColor = conf.color;
+
+        const dirs = conf.directions;
+        let defaultDir = dirs[0].id;
+        if (dirs[0].excludeStations.includes(best.name)) {
+            defaultDir = dirs[1].id;
+        }
+        
+        switchDirection(defaultDir);
+    }
+
+    // ==========================================
+    // 3. 切換邏輯
+    // ==========================================
+    function switchDirection(dirId) {
+        appState.dirId = dirId;
+        const config = METRO_CONFIG[appState.lineKey];
+        const container = document.getElementById('btn-container');
+        container.innerHTML = "";
+
+        config.directions.forEach(d => {
+            if (d.excludeStations.includes(appState.station.name)) return;
+
+            // 動態修改按鈕文字
+            let btnLabel = d.label;
+            if (d.id === 'north') {
+                if (appState.station.branch === 'huilong') btnLabel = "往 迴龍";
+                else if (appState.station.branch === 'luzhou') btnLabel = "往 蘆洲";
+            }
+
+            const btn = document.createElement('button');
+            btn.className = `btn ${d.id === dirId ? 'active' : ''}`;
+            btn.innerText = btnLabel;
+            btn.onclick = () => switchDirection(d.id);
+            container.appendChild(btn);
+        });
+
+        renderTimetable();
+    }
+
+    // ==========================================
+    // 4. 核心渲染 (支援平假日讀取)
+    // ==========================================
+    function renderTimetable() {
+        const list = document.getElementById('timetable');
+        list.innerHTML = "";
+        
+        if (!appState.station) return;
+
+        const config = METRO_CONFIG[appState.lineKey];
+        const dirConfig = config.directions.find(d => d.id === appState.dirId);
+        
+        if (!dirConfig) return;
+
+        let rawTrains = [];
+        let hasDataSource = false;
+
+        // ★ 關鍵：根據 appState.dayType (weekday/weekend) 選擇資料來源
+        const currentSources = dirConfig.sources[appState.dayType];
+
+        if (!currentSources) {
+            list.innerHTML = `<li class="time-item">設定檔錯誤：無此日期類型資料</li>`;
+            return;
+        }
+
+        // 1. 收集資料
+        currentSources.forEach(varName => {
+            const dataObj = window[varName];
+            if (dataObj && dataObj[appState.station.id]) {
+                hasDataSource = true;
+                const stationData = dataObj[appState.station.id];
+                
+                let type = "UNKNOWN";
+                if (varName.includes("HUILONG")) type = "H";
+                if (varName.includes("LUZHOU")) type = "L";
+                if (varName.includes("SOUTH")) type = "S";
+
+                stationData.times.forEach(t => {
+                    rawTrains.push({ time: t, type: type });
+                });
+            }
+        });
+
+        if (!hasDataSource) {
+            list.innerHTML = `<li class="time-item" style="justify-content:center; color:#999;">無資料 (請檢查 JS 檔變數)</li>`;
+            return;
+        }
+
+        // 2. 去重複
+        let uniqueMap = new Map();
+        rawTrains.forEach(train => {
+            if (!uniqueMap.has(train.time)) {
+                uniqueMap.set(train.time, train);
+            }
+        });
+        let allTrains = Array.from(uniqueMap.values());
+
+        // 3. 排序
+        allTrains.sort((a, b) => a.time - b.time);
+
+        // 4. 強制交替邏輯 (共線段往北)
+        if (appState.station.branch === 'common' && appState.dirId === 'north' && allTrains.length > 0) {
+            let currentType = allTrains[0].type;
+            if (currentType !== 'H' && currentType !== 'L') currentType = 'H';
+
+            allTrains.forEach((train, index) => {
+                if (index === 0) {
+                    train.type = currentType;
+                } else {
+                    let prevType = allTrains[index - 1].type;
+                    train.type = (prevType === 'H') ? 'L' : 'H';
+                }
+            });
+        }
+
+        // 5. 過濾未來時間
+        const now = new Date();
+        let nowMins = now.getHours() * 60 + now.getMinutes();
+        if (nowMins < 240) nowMins += 1440;
+
+        const upcoming = allTrains.filter(item => item.time >= nowMins).slice(0, 10);
+
+        if (upcoming.length === 0) {
+            list.innerHTML = "<li class='time-item'>本日已無發車</li>";
+            return;
+        }
+
+        // 6. 渲染
+        upcoming.forEach(item => {
+            let mins = item.time;
+            let h = Math.floor(mins / 60);
+            let m = mins % 60;
+            if (h >= 24) h -= 24;
+            const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+            
+            let diff = mins - nowMins;
+            let statusText = "";
+            let isRed = false; 
+
+            if (diff <= 0) {
+                statusText = "進站中";
+                isRed = true;
+            }else {
+                statusText = `約 ${diff} 分`;
+                if (diff <= 10) isRed = true;
+            }
+
+            const li = document.createElement('li');
+            li.className = 'time-item';
+            
+            let tagHtml = "";
+            if (appState.station.branch === 'common' && appState.dirId === 'north') {
+                if (item.type === 'H') tagHtml = `<span class="dest-tag tag-huilong">往迴龍</span>`;
+                else if (item.type === 'L') tagHtml = `<span class="dest-tag tag-luzhou">往蘆洲</span>`;
+            }
+
+            li.innerHTML = `
+                <div>
+                    <span class="time-val">${timeStr}</span>
+                    ${tagHtml}
+                </div>
+                <span class="time-status ${isRed ? 'status-urgent' : ''}">${statusText}</span>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    setInterval(renderTimetable, 30000);
+</script>
+
+</body>
+</html>
