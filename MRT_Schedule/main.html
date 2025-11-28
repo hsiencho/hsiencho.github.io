@@ -141,20 +141,30 @@
     // 2. 初始化與定位
     // ==========================================
     window.onload = function() {
-        checkDayType(); // 判斷日期
+        checkDayType(); // 先判斷日期
 
         if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
+            // 顯示狀態
+            document.getElementById('status-text').innerText = "讀取最新定位紀錄...";
+
+            // ★ 改用 watchPosition
+            // 優點：會立刻回傳手機內建的「最後一次已知位置」(Google Maps 的紀錄)
+            const watchId = navigator.geolocation.watchPosition(
+                // 成功回呼 (可能會被呼叫多次：第一次是舊紀錄，第二次是新紀錄)
                 (pos) => {
+                    // 為了避免太舊的紀錄導致誤判 (例如上次定位在高雄)，可以加個簡單判斷
+                    // 但通常捷運通勤族上次定位都在附近，直接用即可
                     autoLocate(pos.coords.latitude, pos.coords.longitude);
                 },
+                // 失敗回呼
                 (err) => {
-                    document.getElementById('status-text').innerText = "定位失敗，使用預設值";
-                    autoLocate(25.0635, 121.5117);
+                    console.warn("定位失敗:", err.message);
+                    // 只有當完全拿不到資料時才切換預設值
+                    if (document.getElementById('ui-station-name').innerText === "---") {
+                        document.getElementById('status-text').innerText = "無法取得定位，使用預設";
+                        autoLocate(25.0635, 121.5117); // 預設大橋頭
+                    }
                 },
-                {
-                    enableHighAccuracy: false;
-                }
             );
         } else {
             autoLocate(25.0635, 121.5117);
@@ -382,3 +392,4 @@
 </body>
 
 </html>
+
