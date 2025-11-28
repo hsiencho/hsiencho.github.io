@@ -173,7 +173,7 @@
     <div class="station-info-bar">
         <div class="station-left">
             <div class="badges-container" id="ui-badges"></div>
-            <div class="station-name" id="ui-station-name">載入中</div>
+            <div class="station-name" id="ui-station-name">...</div>
         </div>
         <div class="gps-status" id="status-text">定位中...</div>
     </div>
@@ -186,7 +186,24 @@
     // ==========================================
     // 1. 初始化
     // ==========================================
-     window.onload = function() {
+    const LOADING_TEXTS = [
+        "正在幫你追捷運...",
+        "正在計算要不要用跑的...",
+        "正在跟站長討時刻表...",
+        "正在定位你的悠遊卡...",
+        "衛星正在瞄準車站...",
+        "捷運來接你了喔~~",
+        "我買TPASS沒跟我說會看到這個",
+        "再等一下，車還沒開走..."
+    ];
+
+    function getFunLoading() {
+        const idx = Math.floor(Math.random() * LOADING_TEXTS.length);
+        return LOADING_TEXTS[idx];
+    }
+
+    window.onload = function() {
+        document.getElementById('ui-station-name').innerText = getFunLoading();
         checkDayType(); // 判斷日期
 
         if ("geolocation" in navigator) {
@@ -311,7 +328,9 @@
             // 插入 HTML 結構
             card.innerHTML = `
                 <div class="direction-buttons" id="btns-${item.key}"></div>
-                <ul class="time-list" id="list-${item.key}"><li class="empty-msg">讀取中...</li></ul>
+                <ul class="time-list" id="list-${item.key}">
+                    <li class="empty-msg">${getFunLoading()}</li>
+                </ul>
             `;
             scroller.appendChild(card);
 
