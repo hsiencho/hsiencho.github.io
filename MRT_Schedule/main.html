@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>捷運即時發車</title>
+    <script src="mrt_o_data.js"></script>
+    <script src="mrt_r_data.js"></script>
+    <script src="mrt_g_data.js"></script>
+    <script src="mrt_bl_data.js"></script>
+    <script src="mrt_br_data.js"></script>
+    <script src="mrt_y_data.js"></script>
+    <script src="mrt_t_data.js"></script>
+    <script src="config.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #555; /* 初始顏色，會隨路線變更 */
+            --bg-color: #f5f5f5;
+            --text-dark: #333;
+            --status-red: #d32f2f;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; 
+            background: var(--bg-color); 
+            margin: 0; 
+            padding: 0; 
+            color: var(--text-dark); 
+            overflow-x: hidden; /* 防止整個頁面左右晃動 */
+        }
+        
+        /* === 1. 固定頂部 Header === */
+        .header { 
+            background-color: var(--primary-color); 
+            color: white; 
+            padding: 12px 0; 
+            text-align: center; 
+            position: sticky; 
+            top: 0; 
+            z-index: 100;
+            transition: background-color 0.4s ease; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header h1 { margin: 0; font-size: 1.1rem; }
+        .day-badge { 
+            position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
+            background: rgba(255,255,255,0.25); padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; 
+        }
+
+        /* === 2. 車站資訊列 (Sticky) === */
+        .station-info-bar {
+            background: #fff;
+            padding: 12px 20px;
+            border-bottom: 1px solid #eee;
+            position: sticky;
+            top: 45px; /* Header 高度 */
+            z-index: 90;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .station-left { display: flex; align-items: center; gap: 10px; }
+        .station-name { font-size: 1.5rem; font-weight: bold; }
+        .gps-status { font-size: 0.8rem; color: #888; text-align: right; }
+
+        /* 路線代號按鈕容器 */
+        .badges-container { display: flex; gap: 6px; }
+        .station-id-btn { 
+            font-size: 0.9rem; font-weight: bold; color: white; 
+            padding: 4px 8px; border-radius: 6px; cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        .station-id-btn:active { transform: scale(0.95); opacity: 0.8; }
+
+        /* === 3. 橫向捲動容器 (Carousel) === */
+        .cards-scroller {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            
+            /* 滾動對齊設定 */
+            scroll-snap-type: x mandatory;
+            
+            /* --- 關鍵修改 --- */
+            /* 定義卡片實際寬度：取 85vw 和 400px 之中較小者 */
+            --card-real-width: min(85vw, 400px);
+            
+            /* 計算左右 Padding：讓第一張卡片的中心點剛好在螢幕正中央 (50vw) */
+            padding-inline: calc(50vw - (var(--card-real-width) / 2));
+            
+            padding-top: 20px;
+            padding-bottom: 40px;
+            /* ---------------- */
+
+            gap: 15px; 
+            -webkit-overflow-scrolling: touch; 
+            scroll-behavior: smooth;
+        }
+        
+        .cards-scroller::-webkit-scrollbar { display: none; }
+
+        /* === 4. 卡片樣式 === */
+        .line-card {
+            /* --- 關鍵修改 --- */
+            /* 寬度直接使用我們上面定義的邏輯，確保與 Padding 計算一致 */
+            flex: 0 0 min(85vw, 400px);
+            max-width: 400px; /* 雙重保險 */
+            /* ---------------- */
+
+            scroll-snap-align: center; /* 對齊正中間 */
+            
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border-top: 6px solid #ccc;
+            position: relative;
+        }
+
+        /* 卡片內的按鈕區 */
+        .direction-buttons { 
+            display: flex; gap: 10px; padding: 15px; 
+            background: #fafafa; border-bottom: 1px solid #eee; 
+        }
+        .btn { 
+            flex: 1; padding: 10px; border: none; border-radius: 8px; 
+            background: #e0e0e0; cursor: pointer; font-weight: bold; 
+            color: #666; transition: 0.2s; 
+        }
+        .btn.active { color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        
+        /* 時刻表列表 */
+        .time-list { list-style: none; padding: 0; margin: 0; min-height: 250px; }
+        .time-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            padding: 14px 20px; border-bottom: 1px solid #f5f5f5; 
+        }
+        .time-val { 
+            font-size: 1.3rem; 
+            font-weight: bold; 
+            font-family: monospace; 
+            letter-spacing: 1px; 
+            color: #333; 
+        }
+        .time-status { font-weight: bold; font-size: 0.95rem; color: #555; }
+        .status-urgent { color: var(--status-red); }
+
+        .dest-tag { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
+        .tag-huilong { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+        .tag-luzhou { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+
+        .empty-msg { padding: 40px; text-align: center; color: #aaa; }
+
+        .gps-status { 
+            font-size: 0.8rem; 
+            color: #888; 
+            text-align: right; 
+            line-height: 1.4; /* 加入這行，讓兩行字中間有一點空隙 */
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="header" id="ui-header">
+        <h1 id="ui-line-name">捷運時刻表</h1>
+        <div class="day-badge" id="day-type-badge">...</div>
+    </div>
+
+    <div class="station-info-bar">
+        <div class="station-left">
+            <div class="badges-container" id="ui-badges"></div>
+            <div class="station-name" id="ui-station-name">載入中</div>
+        </div>
+        <div class="gps-status" id="status-text">定位中...</div>
+    </div>
+
+    <div class="cards-scroller" id="scroller">
+        </div>
+
+<script>
+
+    // ==========================================
+    // 1. 初始化
+    // ==========================================
+     window.onload = function() {
+        checkDayType(); // 判斷日期
+
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    autoLocate(pos.coords.latitude, pos.coords.longitude);
+                },
+                (err) => {
+                    document.getElementById('status-text').innerText = "定位失敗，預設[民權西路]";
+                    autoLocate(25.0620, 121.5193);
+                }
+            );
+        } else {
+            // 預設座標改為民權西路
+            autoLocate(25.0620, 121.5193);
+        }
+    };
+
+    function checkDayType() {
+        const d = new Date().getDay();
+        const isWeekend = (d === 0 || d === 6);
+        appState.dayType = isWeekend ? 'weekend' : 'weekday';
+        document.getElementById('day-type-badge').innerText = isWeekend ? "假日時刻" : "平日時刻";
+    }
+
+    // ==========================================
+    // 2. 定位邏輯
+    // ==========================================
+    function autoLocate(lat, lon) {
+        let minD = Infinity;
+        let bestName = "";
+
+        // 找最近車站名稱
+        for (const config of Object.values(METRO_CONFIG)) {
+            config.stations.forEach(st => {
+                const d = getDist(lat, lon, st.lat, st.lon);
+                if (d < minD) { minD = d; bestName = st.name; }
+            });
+        }
+        if (minD > 1) {minD *= 1.18};
+
+        // 計算數據
+        const distVal = minD.toFixed(1);
+        const walkMin = Math.ceil(minD * 14); // 步行約 4km/h -> 15分/km
+        const bikeMin = Math.ceil(minD * 6);  // 車程約 20km/h -> 3分/km
+
+        document.getElementById('status-text').innerHTML = 
+            `距離 ${distVal} km<br>` +
+            `<span style="font-size: 0.85em; opacity: 0.9;">步行約 ${walkMin} 分 / 車程約 ${bikeMin} 分</span>`;
+
+        document.getElementById('ui-station-name').innerText = bestName;
+
+        // 建立卡片 UI
+        buildCards(bestName);
+    }
+
+    function getDist(lat1, lon1, lat2, lon2) {
+        const R = 6371, p = Math.PI/180;
+        const a = 0.5 - Math.cos((lat2-lat1)*p)/2 + Math.cos(lat1*p)*Math.cos(lat2*p)*(1-Math.cos((lon2-lon1)*p))/2;
+        return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    // ==========================================
+    // 3. 建立卡片 (核心)
+    // ==========================================
+    function buildCards(stationName) {
+        const scroller = document.getElementById('scroller');
+        const badgesDiv = document.getElementById('ui-badges');
+        scroller.innerHTML = "";
+        badgesDiv.innerHTML = "";
+        appState.activeCards = [];
+
+        // 1. 找出所有經過此站的路線
+        const matched = [];
+        for (const [key, config] of Object.entries(METRO_CONFIG)) {
+            const st = config.stations.find(s => s.name === stationName);
+            if (st) {
+                matched.push({ key, config, st });
+            }
+        }
+
+        if (matched.length === 0) {
+            scroller.innerHTML = "<div class='empty-msg'>查無此站資料</div>";
+            return;
+        }
+
+        // 2. 建立 DOM
+        matched.forEach((item, idx) => {
+            // A. 左上角徽章 (點擊滑動)
+            const badge = document.createElement('div');
+            badge.className = 'station-id-btn';
+            badge.innerText = item.st.id;
+            badge.style.backgroundColor = item.config.color;
+            badge.onclick = () => {
+                document.getElementById('card-' + item.key).scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            };
+            badgesDiv.appendChild(badge);
+
+            // B. 卡片
+            const card = document.createElement('div');
+            card.className = 'line-card';
+            card.id = 'card-' + item.key;
+            card.dataset.color = item.config.color; // 存顏色給 Observer 用
+            card.style.borderColor = item.config.color;
+
+            // 預設方向 (若該站是終點站，選另一個方向)
+            let dirId = item.config.directions[0].id;
+            if (item.config.directions[0].excludeStations.includes(stationName)) {
+                dirId = item.config.directions[1].id;
+            }
+
+            // 儲存狀態以便更新
+            const cardState = {
+                lineKey: item.key,
+                config: item.config,
+                station: item.st,
+                currentDir: dirId,
+                dom: card
+            };
+            appState.activeCards.push(cardState);
+
+            // 插入 HTML 結構
+            card.innerHTML = `
+                <div class="direction-buttons" id="btns-${item.key}"></div>
+                <ul class="time-list" id="list-${item.key}"><li class="empty-msg">讀取中...</li></ul>
+            `;
+            scroller.appendChild(card);
+
+            // 渲染內容
+            renderButtons(cardState);
+            renderTimes(cardState);
+        });
+
+        // 3. 啟動滑動監聽
+        initObserver();
+    }
+
+    // ==========================================
+    // 4. 渲染按鈕與時間
+    // ==========================================
+    function renderButtons(cardState) {
+        const div = cardState.dom.querySelector('.direction-buttons');
+        div.innerHTML = "";
+
+        cardState.config.directions.forEach(d => {
+            if (d.excludeStations.includes(cardState.station.name)) return;
+
+            // 文字修正
+            let label = d.label;
+            if (cardState.lineKey === 'orange' && d.id === 'north') {
+                if (cardState.station.branch === 'huilong') label = "往 迴龍";
+                else if (cardState.station.branch === 'luzhou') label = "往 蘆洲";
+            }
+
+            const btn = document.createElement('button');
+            btn.className = 'btn';
+            btn.innerText = label;
+            
+            if (d.id === cardState.currentDir) {
+                btn.classList.add('active');
+                btn.style.backgroundColor = cardState.config.color;
+            }
+
+            btn.onclick = () => {
+                cardState.currentDir = d.id;
+                renderButtons(cardState); // 重繪按鈕
+                renderTimes(cardState);   // 重繪時間
+            };
+            div.appendChild(btn);
+        });
+    }
+
+    function renderTimes(cardState) {
+        const ul = cardState.dom.querySelector('.time-list');
+        ul.innerHTML = "";
+
+        const dirConfig = cardState.config.directions.find(d => d.id === cardState.currentDir);
+        if (!dirConfig) return;
+
+        const sources = dirConfig.sources[appState.dayType];
+        if (!sources) { ul.innerHTML="<li>無資料設定</li>"; return; }
+
+        let trains = [];
+        
+        // 從全域變數讀取資料
+        sources.forEach(varName => {
+            if (typeof window[varName] !== 'undefined' && window[varName][cardState.station.id]) {
+                const raw = window[varName][cardState.station.id].times;
+                
+                let type = "N";
+                if (varName.includes("HUILONG")) type = "H";
+                if (varName.includes("LUZHOU")) type = "L";
+
+                raw.forEach(t => trains.push({ time: t, type }));
+            }
+        });
+
+        if (trains.length === 0) {
+            ul.innerHTML = "<li class='empty-msg'>查無資料，請確認 JS 檔案</li>";
+            return;
+        }
+
+        // 去重排序
+        const unique = new Map();
+        trains.forEach(t => unique.set(t.time, t));
+        const sorted = Array.from(unique.values()).sort((a,b)=>a.time - b.time);
+
+        // 橘線共線段邏輯
+        if (cardState.lineKey === 'orange' && cardState.station.branch === 'common' && cardState.currentDir === 'north') {
+            if (sorted.length > 0) {
+                let cur = (sorted[0].type==='H'||sorted[0].type==='L') ? sorted[0].type : 'H';
+                sorted.forEach((t, i) => {
+                    if (i===0) t.type = cur;
+                    else t.type = (sorted[i-1].type === 'H') ? 'L' : 'H';
+                });
+            }
+        }
+
+        // 過濾未來班次
+        const now = new Date();
+        let nowMins = now.getHours() * 60 + now.getMinutes();
+        if (nowMins < 240) nowMins += 1440; // 凌晨 00-04 視為深夜
+
+        const upcoming = sorted.filter(t => t.time >= nowMins).slice(0, 8);
+
+        if (upcoming.length === 0) {
+            ul.innerHTML = "<li class='empty-msg'>本日已無發車</li>";
+            return;
+        }
+
+        upcoming.forEach(item => {
+            let h = Math.floor(item.time / 60);
+            let m = item.time % 60;
+            if(h>=24) h-=24;
+            const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
+
+            let diff = item.time - nowMins;
+            let status = (diff<=0) ? "進站中" : `約 ${diff} 分`;
+            let isRed = (diff<=10 || diff<=0);
+
+            // 標籤
+            let tag = "";
+            if (cardState.lineKey === 'orange' && cardState.station.branch === 'common' && cardState.currentDir === 'north') {
+                if(item.type==='H') tag = `<span class="dest-tag tag-huilong">往迴龍</span>`;
+                else if(item.type==='L') tag = `<span class="dest-tag tag-luzhou">往蘆洲</span>`;
+            }
+
+            const li = document.createElement('li');
+            li.className = 'time-item';
+            li.innerHTML = `
+                <div>
+                    <span class="time-val">${timeStr}</span>
+                    ${tag}
+                </div>
+                <span class="time-status ${isRed ? 'status-urgent' : ''}">${status}</span>
+            `;
+            ul.appendChild(li);
+        });
+    }
+
+    // ==========================================
+    // 5. 滑動監聽 (變色)
+    // ==========================================
+    function initObserver() {
+        const header = document.getElementById('ui-header');
+        
+        const obs = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const color = entry.target.dataset.color;
+                    header.style.backgroundColor = color;
+                }
+            });
+        }, { 
+            root: document.getElementById('scroller'), 
+            threshold: 0.55 // 超過 55% 顯示就變色
+        });
+
+        document.querySelectorAll('.line-card').forEach(c => obs.observe(c));
+    }
+
+    // 自動更新
+    setInterval(() => {
+        appState.activeCards.forEach(c => renderTimes(c));
+    }, 10000);
+
+</script>
+</body>
+</html>
