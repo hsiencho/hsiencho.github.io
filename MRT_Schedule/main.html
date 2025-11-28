@@ -141,26 +141,21 @@
     // 2. 初始化與定位
     // ==========================================
     window.onload = function() {
-        checkDayType(); // 先判斷日期
-
+        checkDayType();
+    
+        // 先顯示預設值
+        autoLocate(25.0635, 121.5117);
+    
         if ("geolocation" in navigator) {
-            // 顯示狀態
-            document.getElementById('status-text').innerText = "讀取最新定位紀錄...";
-
-            // ★ 改用 watchPosition
-            // 優點：會立刻回傳手機內建的「最後一次已知位置」(Google Maps 的紀錄)
-            const watchId = navigator.geolocation.watchPosition(
-    (pos) => {
-        autoLocate(pos.coords.latitude, pos.coords.longitude);
-    },
-    (err) => console.log("定位失敗"),
-    {
-        enableHighAccuracy: false,
-        maximumAge: 30000
-    }
-);
-        } else {
-            autoLocate(25.0635, 121.5117);
+            navigator.geolocation.getCurrentPosition(
+                pos => autoLocate(pos.coords.latitude, pos.coords.longitude),
+                err => console.log("定位失敗"),
+                {
+                    enableHighAccuracy: false, // 關高精度更快
+                    timeout: 1200,             // 超過1.2秒直接放棄
+                    maximumAge: 120000         // 允許用兩分鐘內的快取
+                }
+            );
         }
     };
 
@@ -385,6 +380,7 @@
 </body>
 
 </html>
+
 
 
 
