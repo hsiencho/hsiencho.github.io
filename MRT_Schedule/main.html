@@ -254,18 +254,27 @@
             loadStartTime = Date.now(); // 記錄開始時間
         }
 
+        // 定位選項設定
+        const geoOptions = {
+            enableHighAccuracy: false, // ★ 關鍵：設為 false 讓安卓優先用 Wi-Fi/基地台定位 (不用等 GPS 衛星)
+            timeout: 6000,             // 設定 6 秒超時，如果太久就直接切換到預設站點，不要卡死
+            maximumAge: 60000          // 接受 60 秒內的快取紀錄 (如果剛開過地圖，直接拿舊資料，秒開)
+        };
+
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
                     handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
                 },
                 (err) => {
+                    console.warn("定位失敗或逾時:", err.message);
                     // 定位失敗 fallback
-                    handleLocationSuccess(25.0463, 121.5175, isBackgroundRefresh, true); 
-                }
+                    handleLocationSuccess(25.039940, 121.460966, isBackgroundRefresh, true); 
+                },
+                geoOptions // ★ 記得把選項傳進去
             );
         } else {
-            handleLocationSuccess(25.0463, 121.5175, isBackgroundRefresh, true);
+            handleLocationSuccess(25.039940, 121.460966, isBackgroundRefresh, true);
         }
     }
 
@@ -572,3 +581,4 @@
 </script>
 </body>
 </html>
+
