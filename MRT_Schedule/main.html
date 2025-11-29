@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>捷運即時發車</title>
+    <title>捷運發車時刻表</title>
+    
     <script src="mrt_o_data.js"></script>
     <script src="mrt_r_data.js"></script>
     <script src="mrt_g_data.js"></script>
@@ -11,11 +12,14 @@
     <script src="mrt_br_data.js"></script>
     <script src="mrt_y_data.js"></script>
     <script src="mrt_t_data.js"></script>
+    
     <script src="config.js"></script>
+    
+    <script src="meme_by_VulcandDays.js"></script> 
 
     <style>
         :root {
-            --primary-color: #555; /* 初始顏色，會隨路線變更 */
+            --primary-color: #555;
             --bg-color: #f5f5f5;
             --text-dark: #333;
             --status-red: #d32f2f;
@@ -26,10 +30,10 @@
             margin: 0; 
             padding: 0; 
             color: var(--text-dark); 
-            overflow-x: hidden; /* 防止整個頁面左右晃動 */
+            overflow-x: hidden; 
         }
         
-        /* === 1. 固定頂部 Header === */
+        /* === Header === */
         .header { 
             background-color: var(--primary-color); 
             color: white; 
@@ -47,13 +51,13 @@
             background: rgba(255,255,255,0.25); padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; 
         }
 
-        /* === 2. 車站資訊列 (Sticky) === */
+        /* === Station Info === */
         .station-info-bar {
             background: #fff;
             padding: 12px 20px;
             border-bottom: 1px solid #eee;
             position: sticky;
-            top: 45px; /* Header 高度 */
+            top: 45px;
             z-index: 90;
             display: flex;
             justify-content: space-between;
@@ -61,9 +65,8 @@
         }
         .station-left { display: flex; align-items: center; gap: 10px; }
         .station-name { font-size: 1.5rem; font-weight: bold; }
-        .gps-status { font-size: 0.8rem; color: #888; text-align: right; }
+        .gps-status { font-size: 0.8rem; color: #888; text-align: right; line-height: 1.4; }
 
-        /* 路線代號按鈕容器 */
         .badges-container { display: flex; gap: 6px; }
         .station-id-btn { 
             font-size: 0.9rem; font-weight: bold; color: white; 
@@ -73,43 +76,28 @@
         }
         .station-id-btn:active { transform: scale(0.95); opacity: 0.8; }
 
-        /* === 3. 橫向捲動容器 (Carousel) === */
+        /* === Scroller === */
         .cards-scroller {
             display: flex;
             flex-wrap: nowrap;
             overflow-x: auto;
-            
-            /* 滾動對齊設定 */
             scroll-snap-type: x mandatory;
-            
-            /* --- 關鍵修改 --- */
-            /* 定義卡片實際寬度：取 85vw 和 400px 之中較小者 */
             --card-real-width: min(85vw, 400px);
-            
-            /* 計算左右 Padding：讓第一張卡片的中心點剛好在螢幕正中央 (50vw) */
             padding-inline: calc(50vw - (var(--card-real-width) / 2));
-            
             padding-top: 20px;
             padding-bottom: 40px;
-            /* ---------------- */
-
             gap: 15px; 
             -webkit-overflow-scrolling: touch; 
             scroll-behavior: smooth;
+            min-height: 60vh; /* 確保有高度顯示梗圖 */
         }
-        
         .cards-scroller::-webkit-scrollbar { display: none; }
 
-        /* === 4. 卡片樣式 === */
+        /* === Cards === */
         .line-card {
-            /* --- 關鍵修改 --- */
-            /* 寬度直接使用我們上面定義的邏輯，確保與 Padding 計算一致 */
             flex: 0 0 min(85vw, 400px);
-            max-width: 400px; /* 雙重保險 */
-            /* ---------------- */
-
-            scroll-snap-align: center; /* 對齊正中間 */
-            
+            max-width: 400px;
+            scroll-snap-align: center;
             background: #fff;
             border-radius: 16px;
             box-shadow: 0 8px 20px rgba(0,0,0,0.08);
@@ -119,8 +107,6 @@
             border-top: 6px solid #ccc;
             position: relative;
         }
-
-        /* 卡片內的按鈕區 */
         .direction-buttons { 
             display: flex; gap: 10px; padding: 15px; 
             background: #fafafa; border-bottom: 1px solid #eee; 
@@ -132,18 +118,14 @@
         }
         .btn.active { color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         
-        /* 時刻表列表 */
         .time-list { list-style: none; padding: 0; margin: 0; min-height: 250px; }
         .time-item { 
             display: flex; justify-content: space-between; align-items: center; 
             padding: 14px 20px; border-bottom: 1px solid #f5f5f5; 
         }
         .time-val { 
-            font-size: 1.3rem; 
-            font-weight: bold; 
-            font-family: monospace; 
-            letter-spacing: 1px; 
-            color: #333; 
+            font-size: 1.3rem; font-weight: bold; font-family: monospace; 
+            letter-spacing: 1px; color: #333; 
         }
         .time-status { font-weight: bold; font-size: 0.95rem; color: #555; }
         .status-urgent { color: var(--status-red); }
@@ -154,13 +136,46 @@
 
         .empty-msg { padding: 40px; text-align: center; color: #aaa; }
 
-        .gps-status { 
-            font-size: 0.8rem; 
-            color: #888; 
-            text-align: right; 
-            line-height: 1.4; /* 加入這行，讓兩行字中間有一點空隙 */
+        /* === 梗圖專用樣式 === */
+        .meme-container {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+            text-align: center;
+        }
+        .meme-title {
+            font-size: 1rem;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        .meme-img {
+            max-width: 90%;
+            max-height: 50vh;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            object-fit: contain;
+            background: #eee;
+            min-height: 200px;
         }
 
+        /* === Footer (瀏覽人次) === */
+        .footer {
+            text-align: center;
+            padding: 30px 10px;
+            color: #999;
+            font-size: 0.8rem;
+            margin-top: auto; /* 推到最底部 */
+        }
+        .footer span {
+            font-family: monospace;
+            font-weight: bold;
+            color: #666;
+            margin: 0 4px;
+        }
     </style>
 </head>
 <body>
@@ -179,13 +194,19 @@
     </div>
 
     <div class="cards-scroller" id="scroller">
+        <div class="meme-container" id="loading-meme-area">
+            <div class="meme-title">每日一梗圖 (?)</div>
+            <img src="" class="meme-img" id="meme-display" alt="讀取中...">
         </div>
+    </div>
 
 <script>
+    // ==========================================
+    // 設定
+    // ==========================================
+    const MIN_LOADING_MS = 3000; // 最低顯示時間 (毫秒)，預設 1 秒
+    const AUTO_REFRESH_SEC = 60; // 自動重新定位秒數
 
-    // ==========================================
-    // 1. 初始化
-    // ==========================================
     const LOADING_TEXTS = [
         "正在幫你追捷運...",
         "正在計算要不要用跑的...",
@@ -193,44 +214,111 @@
         "正在定位你的悠遊卡...",
         "衛星正在瞄準車站...",
         "捷運來接你了喔~~",
-        "我買TPASS沒跟我說會看到這個",
+        "我買TPASS的時候\n沒跟我說會看到這個",
         "再等一下，車還沒開走..."
     ];
+
+    let loadStartTime = 0; // 記錄開始定位的時間
+    let isFirstLoad = true; // 標記是否為第一次載入
 
     function getFunLoading() {
         const idx = Math.floor(Math.random() * LOADING_TEXTS.length);
         return LOADING_TEXTS[idx];
     }
 
+    // ==========================================
+    // 1. 初始化
+    // ==========================================
     window.onload = function() {
+        // 1. 顯示梗圖
+        showRandomMeme();
+
+        // 2. 更新文字
         document.getElementById('ui-station-name').innerText = getFunLoading();
-        checkDayType(); // 判斷日期
+        checkDayType();
+
+        // 3. 啟動第一次定位流程
+        startLocationProcess();
+
+        // 4. 設定每 60 秒重新定位
+        setInterval(() => {
+            console.log("觸發自動重新定位 (60s)...");
+            startLocationProcess(true); 
+        }, AUTO_REFRESH_SEC * 1000);
+    };
+
+    // ==========================================
+    // 2. 顯示隨機梗圖
+    // ==========================================
+    function showRandomMeme() {
+        // 檢查全域變數 MEME_DATA 是否存在 (由 meme_data.js 提供)
+        if (typeof window.MEME_DATA !== 'undefined' && Array.isArray(window.MEME_DATA) && window.MEME_DATA.length > 0) {
+            const randomUrl = window.MEME_DATA[Math.floor(Math.random() * window.MEME_DATA.length)];
+            document.getElementById('meme-display').src = randomUrl;
+        } else {
+            document.getElementById('meme-display').alt = "沒有找到梗圖資料 (請檢查 meme_data.js)";
+            console.warn("MEME_DATA is undefined. Make sure meme_data.js is loaded correctly.");
+        }
+    }
+
+    // ==========================================
+    // 3. 定位流程控制 (含時間延遲邏輯)
+    // ==========================================
+    function startLocationProcess(isBackgroundRefresh = false) {
+        if (!isBackgroundRefresh) {
+            loadStartTime = Date.now(); // 記錄開始時間
+        }
 
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 (pos) => {
-                    autoLocate(pos.coords.latitude, pos.coords.longitude);
+                    handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
                 },
                 (err) => {
-                    document.getElementById('status-text').innerText = "定位失敗，預設[民權西路]";
-                    autoLocate(25.0620, 121.5193);
+                    // 定位失敗 fallback
+                    handleLocationSuccess(25.0463, 121.5175, isBackgroundRefresh, true); 
                 }
             );
         } else {
-            // 預設座標改為民權西路
-            autoLocate(25.0620, 121.5193);
+            handleLocationSuccess(25.0463, 121.5175, isBackgroundRefresh, true);
         }
-    };
+    }
+
+    function handleLocationSuccess(lat, lon, isBackgroundRefresh, isError = false) {
+        if (isError) {
+             document.getElementById('status-text').innerText = "定位失敗";
+        }
+
+        // 核心計算：要等待多久？
+        const elapsed = Date.now() - loadStartTime;
+        let remainingTime = 0;
+
+        if (!isBackgroundRefresh) {
+            remainingTime = Math.max(0, MIN_LOADING_MS - elapsed);
+        }
+
+        if(!isBackgroundRefresh) {
+            console.log(`定位耗時: ${elapsed}ms, 強制等待: ${remainingTime}ms`);
+        }
+
+        setTimeout(() => {
+            autoLocate(lat, lon);
+        }, remainingTime);
+    }
 
     function checkDayType() {
-        const d = new Date().getDay();
+        let now = new Date();
+        if (now.getHours() < 2) {
+            now.setDate(now.getDate() - 1);
+        }
+        const d = now.getDay();
         const isWeekend = (d === 0 || d === 6);
         appState.dayType = isWeekend ? 'weekend' : 'weekday';
         document.getElementById('day-type-badge').innerText = isWeekend ? "假日時刻" : "平日時刻";
     }
 
     // ==========================================
-    // 2. 定位邏輯
+    // 4. 定位邏輯與渲染
     // ==========================================
     function autoLocate(lat, lon) {
         let minD = Infinity;
@@ -243,21 +331,30 @@
                 if (d < minD) { minD = d; bestName = st.name; }
             });
         }
-        if (minD > 1) {minD *= 1.18};
+        if (minD > 1) { minD *= 1.18 };
 
         // 計算數據
         const distVal = minD.toFixed(1);
-        const walkMin = Math.ceil(minD * 14); // 步行約 4km/h -> 15分/km
-        const bikeMin = Math.ceil(minD * 6);  // 車程約 20km/h -> 3分/km
+        const walkMin = Math.ceil(minD * 14); 
+        const bikeMin = Math.ceil(minD * 6); 
 
         document.getElementById('status-text').innerHTML = 
             `距離 ${distVal} km<br>` +
             `<span style="font-size: 0.85em; opacity: 0.9;">步行約 ${walkMin} 分 / 車程約 ${bikeMin} 分</span>`;
 
-        document.getElementById('ui-station-name').innerText = bestName;
-
-        // 建立卡片 UI
-        buildCards(bestName);
+        // 判斷是否需要重建 UI
+        const currentStation = document.getElementById('ui-station-name').innerText;
+        
+        if (isFirstLoad || currentStation !== bestName) {
+            document.getElementById('ui-station-name').innerText = bestName;
+            buildCards(bestName);
+            isFirstLoad = false;
+        } else {
+            // 車站沒變，只更新現有卡片的時間
+            if (appState.activeCards) {
+                appState.activeCards.forEach(c => renderTimes(c));
+            }
+        }
     }
 
     function getDist(lat1, lon1, lat2, lon2) {
@@ -267,11 +364,13 @@
     }
 
     // ==========================================
-    // 3. 建立卡片 (核心)
+    // 5. 建立卡片 (核心)
     // ==========================================
     function buildCards(stationName) {
         const scroller = document.getElementById('scroller');
         const badgesDiv = document.getElementById('ui-badges');
+        
+        // 清空 Scroller
         scroller.innerHTML = "";
         badgesDiv.innerHTML = "";
         appState.activeCards = [];
@@ -292,13 +391,14 @@
 
         // 2. 建立 DOM
         matched.forEach((item, idx) => {
-            // A. 左上角徽章 (點擊滑動)
+            // A. 左上角徽章
             const badge = document.createElement('div');
             badge.className = 'station-id-btn';
             badge.innerText = item.st.id;
             badge.style.backgroundColor = item.config.color;
             badge.onclick = () => {
-                document.getElementById('card-' + item.key).scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                const target = document.getElementById('card-' + item.key);
+                if(target) target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
             };
             badgesDiv.appendChild(badge);
 
@@ -306,16 +406,15 @@
             const card = document.createElement('div');
             card.className = 'line-card';
             card.id = 'card-' + item.key;
-            card.dataset.color = item.config.color; // 存顏色給 Observer 用
+            card.dataset.color = item.config.color;
             card.style.borderColor = item.config.color;
 
-            // 預設方向 (若該站是終點站，選另一個方向)
+            // 預設方向
             let dirId = item.config.directions[0].id;
             if (item.config.directions[0].excludeStations.includes(stationName)) {
                 dirId = item.config.directions[1].id;
             }
 
-            // 儲存狀態以便更新
             const cardState = {
                 lineKey: item.key,
                 config: item.config,
@@ -325,7 +424,6 @@
             };
             appState.activeCards.push(cardState);
 
-            // 插入 HTML 結構
             card.innerHTML = `
                 <div class="direction-buttons" id="btns-${item.key}"></div>
                 <ul class="time-list" id="list-${item.key}">
@@ -334,17 +432,15 @@
             `;
             scroller.appendChild(card);
 
-            // 渲染內容
             renderButtons(cardState);
             renderTimes(cardState);
         });
 
-        // 3. 啟動滑動監聽
         initObserver();
     }
 
     // ==========================================
-    // 4. 渲染按鈕與時間
+    // 6. 渲染按鈕與時間
     // ==========================================
     function renderButtons(cardState) {
         const div = cardState.dom.querySelector('.direction-buttons');
@@ -353,7 +449,6 @@
         cardState.config.directions.forEach(d => {
             if (d.excludeStations.includes(cardState.station.name)) return;
 
-            // 文字修正
             let label = d.label;
             if (cardState.lineKey === 'orange' && d.id === 'north') {
                 if (cardState.station.branch === 'huilong') label = "往 迴龍";
@@ -371,8 +466,8 @@
 
             btn.onclick = () => {
                 cardState.currentDir = d.id;
-                renderButtons(cardState); // 重繪按鈕
-                renderTimes(cardState);   // 重繪時間
+                renderButtons(cardState);
+                renderTimes(cardState);
             };
             div.appendChild(btn);
         });
@@ -390,7 +485,6 @@
 
         let trains = [];
         
-        // 從全域變數讀取資料
         sources.forEach(varName => {
             if (typeof window[varName] !== 'undefined' && window[varName][cardState.station.id]) {
                 const raw = window[varName][cardState.station.id].times;
@@ -408,12 +502,10 @@
             return;
         }
 
-        // 去重排序
         const unique = new Map();
         trains.forEach(t => unique.set(t.time, t));
         const sorted = Array.from(unique.values()).sort((a,b)=>a.time - b.time);
 
-        // 橘線共線段邏輯
         if (cardState.lineKey === 'orange' && cardState.station.branch === 'common' && cardState.currentDir === 'north') {
             if (sorted.length > 0) {
                 let cur = (sorted[0].type==='H'||sorted[0].type==='L') ? sorted[0].type : 'H';
@@ -424,10 +516,9 @@
             }
         }
 
-        // 過濾未來班次
         const now = new Date();
         let nowMins = now.getHours() * 60 + now.getMinutes();
-        if (nowMins < 240) nowMins += 1440; // 凌晨 00-04 視為深夜
+        if (nowMins < 120) nowMins += 1440;
 
         const upcoming = sorted.filter(t => t.time >= nowMins).slice(0, 8);
 
@@ -446,7 +537,6 @@
             let status = (diff<=0) ? "進站中" : `約 ${diff} 分`;
             let isRed = (diff<=10 || diff<=0);
 
-            // 標籤
             let tag = "";
             if (cardState.lineKey === 'orange' && cardState.station.branch === 'common' && cardState.currentDir === 'north') {
                 if(item.type==='H') tag = `<span class="dest-tag tag-huilong">往迴龍</span>`;
@@ -467,7 +557,7 @@
     }
 
     // ==========================================
-    // 5. 滑動監聽 (變色)
+    // 7. 滑動監聽
     // ==========================================
     function initObserver() {
         const header = document.getElementById('ui-header');
@@ -481,17 +571,29 @@
             });
         }, { 
             root: document.getElementById('scroller'), 
-            threshold: 0.55 // 超過 55% 顯示就變色
+            threshold: 0.55 
         });
 
         document.querySelectorAll('.line-card').forEach(c => obs.observe(c));
     }
 
-    // 自動更新
+    // 倒數計時自動更新
     setInterval(() => {
-        appState.activeCards.forEach(c => renderTimes(c));
+        if (appState && appState.activeCards && appState.activeCards.length > 0) {
+            appState.activeCards.forEach(c => renderTimes(c));
+        }
     }, 10000);
 
 </script>
+    
+    <div class="footer">
+        <span id="busuanzi_container_site_pv" style="display:none">
+            累積瀏覽 <span id="busuanzi_value_site_pv"><i class="fa fa-spinner fa-spin"></i></span> 人次
+        </span>
+        <br>
+    </div>
+
+    <script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
 </body>
 </html>
