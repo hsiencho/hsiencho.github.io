@@ -224,8 +224,11 @@
 
         // 3. 啟動第一次定位流程
         startLocationProcess();
+        
+        // 4. 啟動全域點擊監聽
+        initGlobalClickListener();
 
-        // 4. 設定每 60 秒重新定位
+        // 5. 設定每 60 秒重新定位
         setInterval(() => {
             console.log("觸發自動重新定位 (60s)...");
             startLocationProcess(true); 
@@ -241,8 +244,8 @@
             const randomUrl = window.MEME_DATA[Math.floor(Math.random() * window.MEME_DATA.length)];
             document.getElementById('meme-display').src = randomUrl;
         } else {
-            document.getElementById('meme-display').alt = "沒有找到梗圖資料 (請檢查 meme_data.js)";
-            console.warn("MEME_DATA is undefined. Make sure meme_data.js is loaded correctly.");
+            document.getElementById('meme-display').alt = "沒有找到梗圖資料";
+            console.warn("MEME_DATA is undefined. Make sure meme_data is loaded correctly.");
         }
     }
 
@@ -449,12 +452,23 @@
             return;
         }
 
+        // ★★★ 判斷是否需要簡化徽章 (超過 3 個路線時) ★★★
+        const isCrowded = matched.length > 2;
+
         // 2. 建立 DOM
         matched.forEach((item, idx) => {
             // A. 左上角徽章
             const badge = document.createElement('div');
             badge.className = 'station-id-btn';
-            badge.innerText = item.st.id;
+            
+            // ★★★ 簡化邏輯 ★★★
+            if (isCrowded) {
+                // 使用 Regex 把數字去掉，只留英文 (例如 "R10" -> "R", "BL12" -> "BL")
+                badge.innerText = item.st.id.replace(/[0-9]/g, '');
+            } else {
+                badge.innerText = item.st.id;
+            }
+            
             badge.style.backgroundColor = item.config.color;
             badge.onclick = () => {
                 const target = document.getElementById('card-' + item.key);
@@ -490,6 +504,7 @@
                     <li class="empty-msg">${getFunLoading()}</li>
                 </ul>
             `;
+            
             scroller.appendChild(card);
 
             renderButtons(cardState);
@@ -637,6 +652,72 @@
         document.querySelectorAll('.line-card').forEach(c => obs.observe(c));
     }
 
+    // ==========================================
+    // 8. 全域點擊切換 (螢幕左右 1/3)
+    // ==========================================
+    function initGlobalClickListener() {
+        document.addEventListener('click', (e) => {
+            // 1. 基本排除 (Header, Info Bar, Footer)
+            if (e.target.closest('.header') || 
+                e.target.closest('.station-info-bar') || 
+                e.target.closest('.footer')) {
+                return;
+            }
+
+            // 取得所有卡片
+            const cards = Array.from(document.querySelectorAll('.line-card'));
+            if (cards.length === 0) return;
+
+            // 2. 找出目前「正中間」是哪一張卡片
+            const screenCenterX = window.innerWidth / 2;
+            let closestCard = null;
+            let minDiff = Infinity;
+
+            cards.forEach(card => {
+                const rect = card.getBoundingClientRect();
+                const cardCenterX = rect.left + rect.width / 2;
+                const diff = Math.abs(cardCenterX - screenCenterX);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestCard = card;
+                }
+            });
+
+            if (!closestCard) return;
+
+            // 找出這張卡片裡的按鈕區域
+            const btnContainer = closestCard.querySelector('.direction-buttons');
+            if (btnContainer) {
+                const btnRect = btnContainer.getBoundingClientRect();
+                
+                // 如果點擊的高度 (clientY) 小於或等於 按鈕的底部 (bottom)
+                // 代表點在按鈕上面或更上面的區域 -> 不執行切換
+                if (e.clientY <= btnRect.bottom) {
+                    return; 
+                }
+            }
+
+            const currentIndex = cards.indexOf(closestCard);
+
+            // 4. 判斷點擊位置 (左 1/3 或 右 1/3)
+            const clickX = e.clientX;
+            const screenWidth = window.innerWidth;
+            const threshold = screenWidth / 3;
+
+            if (clickX < threshold) {
+                // --- 點擊螢幕左側 (上一張) ---
+                if (currentIndex > 0) {
+                    cards[currentIndex - 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                }
+            } else if (clickX > (screenWidth - threshold)) {
+                // --- 點擊螢幕右側 (下一張) ---
+                if (currentIndex < cards.length - 1) {
+                    cards[currentIndex + 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                }
+            }
+        });
+    }
+
     // 倒數計時自動更新
     setInterval(() => {
         if (appState && appState.activeCards && appState.activeCards.length > 0) {
@@ -647,8 +728,3 @@
 </script>
 </body>
 </html>
-
-
-
-
-
