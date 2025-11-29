@@ -342,7 +342,7 @@ const METRO_CONFIG = {
             }
         ],
         stations: [
-            { name: "台北車站", id: "A1", lat: 25.0488, lon: 121.5134, branch: 'common' },
+            { name: "台北車站", id: "A1", lat: 25.0463, lon: 121.5175, branch: 'common' },
             { name: "三重", id: "A2", lat: 25.0558, lon: 121.4847, branch: 'common' },
             { name: "新北產業園區", id: "A3", lat: 25.0615, lon: 121.4599, branch: 'common' },
             { name: "新莊副都心", id: "A4", lat: 25.0594, lon: 121.4468, branch: 'common' },
@@ -373,4 +373,5 @@ let appState = {
     station: null,
     dirId: 'north', // 若切換到藍線記得要改為 'east' 或 'west'，或由程式自動判斷
     dayType: 'weekday'
+
 };
