@@ -272,14 +272,14 @@
         // 1. 發射快取策略 (Lv1)
         runStrategy(PRIORITY.CACHE, {
             enableHighAccuracy: false,
-            timeout: 500,
+            timeout: 1000,
             maximumAge: Infinity
         }, isBackgroundRefresh);
 
         // 2. 發射網路策略 (Lv2)
         runStrategy(PRIORITY.NETWORK, {
             enableHighAccuracy: false,
-            timeout: 4000,
+            timeout: 10000,
             maximumAge: 0
         }, isBackgroundRefresh);
 
@@ -321,6 +321,7 @@
                     }, 2000);
                 } else {
                     document.getElementById('status-text').innerHTML = "<span style='color:red'>定位被拒絕</span>";
+                    handleLocationSuccess(25.0463, 121.5175, isBackgroundRefresh);
                 }
             },
             {
@@ -646,6 +647,7 @@
 </script>
 </body>
 </html>
+
 
 
 
