@@ -247,85 +247,102 @@
     }
 
     // ==========================================
-    // 3. 漸進式定位流程 (Cache -> Network -> GPS)
+    // 3. 競速式定位流程 (Concurrent Race: GPS > Network > Cache)
     // ==========================================
     
-    // 輔助函式：將定位 API 包裝成 Promise
-    function getPosPromise(options) {
-        return new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, options);
-        });
-    }
+    // 定義優先級 (數字越大越重要)
+    const PRIORITY = {
+        NONE: 0,
+        CACHE: 1,
+        NETWORK: 2,
+        GPS: 3
+    };
 
-    async function startLocationProcess(isBackgroundRefresh = false) {
+    let currentPriorityLevel = 0; // 目前顯示的資料等級
+
+    // 啟動定位 (同時發射三種策略)
+    function startLocationProcess(isBackgroundRefresh = false) {
         if (!isBackgroundRefresh) {
             loadStartTime = Date.now();
+            currentPriorityLevel = PRIORITY.NONE; // 重置優先級
         }
 
-        // --- 階段 1: 快取 (Cache) ---
-        // 目的：追求極致響應速度，有舊資料先頂著用
-        if (!isBackgroundRefresh) {
-            try {
-                console.log("[階段1] 讀取快取...");
-                const pos = await getPosPromise({
-                    enableHighAccuracy: false,
-                    timeout: 500,        // 0.5秒內沒讀到就放棄
-                    maximumAge: Infinity // 接受任何時間的舊資料
-                });
-                // 成功取得快取，更新 UI (但不停止，繼續往下跑)
-                handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
-            } catch (e) {
-                // 快取沒有資料，默默忽略，繼續往下
-                console.log("[階段1] 無快取資料");
-            }
-        }
+        console.log("=== 開始多重定位競速 ===");
 
-        // --- 階段 2: 網路定位 (Wi-Fi/基地台) ---
-        // 目的：比 GPS 快，比快取準，更新大概位置
-        try {
-            console.log("[階段2] 網路定位...");
-            const pos = await getPosPromise({
-                enableHighAccuracy: false, // 不開 GPS，求快
-                timeout: 4000,             // 4秒超時
-                maximumAge: 0              // 強制抓新的
-            });
-            // 成功取得大概位置，更新 UI (覆蓋掉剛剛的快取結果)
-            handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
-        } catch (e) {
-            console.log("[階段2] 網路定位略過/失敗");
-        }
+        // 1. 發射快取策略 (Lv1)
+        runStrategy(PRIORITY.CACHE, {
+            enableHighAccuracy: false,
+            timeout: 500,
+            maximumAge: Infinity
+        }, isBackgroundRefresh);
 
-        // --- 階段 3: GPS 定位 (高精準度) ---
-        // 目的：最終確認，並進入無限重試邏輯直到抓到為止
-        attemptGPS(isBackgroundRefresh);
+        // 2. 發射網路策略 (Lv2)
+        runStrategy(PRIORITY.NETWORK, {
+            enableHighAccuracy: false,
+            timeout: 4000,
+            maximumAge: 0
+        }, isBackgroundRefresh);
+
+        // 3. 發射 GPS 策略 (Lv3) - 只有這個會無限重試
+        runGPSStrategy(isBackgroundRefresh);
     }
 
-    // GPS 專用遞迴函式
-    async function attemptGPS(isBackgroundRefresh) {
-        try {
-            console.log("[階段3] GPS 精準定位中...");
-            
-            const pos = await getPosPromise({
-                enableHighAccuracy: true,  // 開啟 GPS
-                timeout: 30000,            // 等待 30 秒
-                maximumAge: 0
-            });
-            
-            // 成功取得精準位置，更新 UI
-            handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
-            
-        } catch (error) {
-            console.warn("GPS 定位暫時失敗:", error.message);
+    // 通用定位執行器 (給快取和網路用)
+    function runStrategy(level, options, isBackgroundRefresh) {
+        if (!navigator.geolocation) return;
 
-            if (error.code === error.PERMISSION_DENIED) {
-                // 只有被拒絕時才顯示錯誤給使用者
-                document.getElementById('status-text').innerHTML = "<span style='color:red'>定位被拒絕，請開啟權限</span>";
-            } else {
-                // 其他狀況 (逾時、訊號弱)，安靜地休息 2 秒後重試
-                setTimeout(() => {
-                    attemptGPS(isBackgroundRefresh);
-                }, 2000);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                tryUpdateLocation(pos, level, isBackgroundRefresh);
+            },
+            (err) => {
+                console.log(`[等級${level}] 定位失敗或逾時:`, err.message);
+            },
+            options
+        );
+    }
+
+    // GPS 專用執行器 (含重試邏輯)
+    function runGPSStrategy(isBackgroundRefresh) {
+        if (!navigator.geolocation) return;
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                tryUpdateLocation(pos, PRIORITY.GPS, isBackgroundRefresh);
+            },
+            (err) => {
+                console.warn("[等級3] GPS 定位暫時失敗:", err.message);
+
+                // 只有被拒絕時才放棄，否則持續重試
+                if (err.code !== err.PERMISSION_DENIED) {
+                    setTimeout(() => {
+                        // 遞迴重試，保持 GPS 監聽
+                        runGPSStrategy(isBackgroundRefresh);
+                    }, 2000);
+                } else {
+                    document.getElementById('status-text').innerHTML = "<span style='color:red'>定位被拒絕</span>";
+                }
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 30000,
+                maximumAge: 0
             }
+        );
+    }
+
+    // 核心鎖定邏輯：決定是否更新 UI
+    function tryUpdateLocation(pos, level, isBackgroundRefresh) {
+        // ★ 關鍵判斷：只有當 新來的等級 > 目前等級 時才更新
+        // 例如：現在是 Network(2)，如果 Cache(1) 比較晚回應，這裡會擋掉，不讓畫面變回舊資料
+        if (level > currentPriorityLevel) {
+            
+            console.log(`[更新成功] 來源等級: ${level} (覆蓋舊等級: ${currentPriorityLevel})`);
+            currentPriorityLevel = level; // 更新目前鎖定等級
+            
+            handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
+        } else {
+            console.log(`[忽略更新] 來源等級: ${level} 低於目前等級: ${currentPriorityLevel}`);
         }
     }
 
@@ -334,12 +351,13 @@
         const elapsed = Date.now() - loadStartTime;
         let remainingTime = 0;
 
+        // 只有第一次載入需要算延遲
         if (!isBackgroundRefresh) {
             remainingTime = Math.max(0, MIN_LOADING_MS - elapsed);
         }
 
         if(!isBackgroundRefresh && remainingTime > 0) {
-            console.log(`[UI] 等待梗圖顯示 (剩餘 ${remainingTime}ms)`);
+            console.log(`[UI] 梗圖保護中，延遲 ${remainingTime}ms 後顯示結果`);
         }
 
         setTimeout(() => {
@@ -628,5 +646,6 @@
 </script>
 </body>
 </html>
+
 
 
