@@ -247,43 +247,90 @@
     }
 
     // ==========================================
-    // 3. 定位流程控制 (含時間延遲邏輯)
+    // 3. 漸進式定位流程 (Cache -> Network -> GPS)
     // ==========================================
-    function startLocationProcess(isBackgroundRefresh = false) {
+    
+    // 輔助函式：將定位 API 包裝成 Promise
+    function getPosPromise(options) {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        });
+    }
+
+    async function startLocationProcess(isBackgroundRefresh = false) {
         if (!isBackgroundRefresh) {
-            loadStartTime = Date.now(); // 記錄開始時間
+            loadStartTime = Date.now();
         }
 
-        // 定位選項設定
-        const geoOptions = {
-            enableHighAccuracy: false, // ★ 關鍵：設為 false 讓安卓優先用 Wi-Fi/基地台定位 (不用等 GPS 衛星)
-            timeout: 6000,             // 設定 6 秒超時，如果太久就直接切換到預設站點，不要卡死
-            maximumAge: 60000          // 接受 60 秒內的快取紀錄 (如果剛開過地圖，直接拿舊資料，秒開)
-        };
+        // --- 階段 1: 快取 (Cache) ---
+        // 目的：追求極致響應速度，有舊資料先頂著用
+        if (!isBackgroundRefresh) {
+            try {
+                console.log("[階段1] 讀取快取...");
+                const pos = await getPosPromise({
+                    enableHighAccuracy: false,
+                    timeout: 500,        // 0.5秒內沒讀到就放棄
+                    maximumAge: Infinity // 接受任何時間的舊資料
+                });
+                // 成功取得快取，更新 UI (但不停止，繼續往下跑)
+                handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
+            } catch (e) {
+                // 快取沒有資料，默默忽略，繼續往下
+                console.log("[階段1] 無快取資料");
+            }
+        }
 
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                    handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
-                },
-                (err) => {
-                    console.warn("定位失敗或逾時:", err.message);
-                    // 定位失敗 fallback
-                    handleLocationSuccess(25.039940, 121.460966, isBackgroundRefresh, true); 
-                },
-                geoOptions // ★ 記得把選項傳進去
-            );
-        } else {
-            handleLocationSuccess(25.039940, 121.460966, isBackgroundRefresh, true);
+        // --- 階段 2: 網路定位 (Wi-Fi/基地台) ---
+        // 目的：比 GPS 快，比快取準，更新大概位置
+        try {
+            console.log("[階段2] 網路定位...");
+            const pos = await getPosPromise({
+                enableHighAccuracy: false, // 不開 GPS，求快
+                timeout: 4000,             // 4秒超時
+                maximumAge: 0              // 強制抓新的
+            });
+            // 成功取得大概位置，更新 UI (覆蓋掉剛剛的快取結果)
+            handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
+        } catch (e) {
+            console.log("[階段2] 網路定位略過/失敗");
+        }
+
+        // --- 階段 3: GPS 定位 (高精準度) ---
+        // 目的：最終確認，並進入無限重試邏輯直到抓到為止
+        attemptGPS(isBackgroundRefresh);
+    }
+
+    // GPS 專用遞迴函式
+    async function attemptGPS(isBackgroundRefresh) {
+        try {
+            console.log("[階段3] GPS 精準定位中...");
+            
+            const pos = await getPosPromise({
+                enableHighAccuracy: true,  // 開啟 GPS
+                timeout: 30000,            // 等待 30 秒
+                maximumAge: 0
+            });
+            
+            // 成功取得精準位置，更新 UI
+            handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
+            
+        } catch (error) {
+            console.warn("GPS 定位暫時失敗:", error.message);
+
+            if (error.code === error.PERMISSION_DENIED) {
+                // 只有被拒絕時才顯示錯誤給使用者
+                document.getElementById('status-text').innerHTML = "<span style='color:red'>定位被拒絕，請開啟權限</span>";
+            } else {
+                // 其他狀況 (逾時、訊號弱)，安靜地休息 2 秒後重試
+                setTimeout(() => {
+                    attemptGPS(isBackgroundRefresh);
+                }, 2000);
+            }
         }
     }
 
     function handleLocationSuccess(lat, lon, isBackgroundRefresh, isError = false) {
-        if (isError) {
-             document.getElementById('status-text').innerText = "定位失敗";
-        }
-
-        // 核心計算：要等待多久？
+        // 計算是否需要等待梗圖時間
         const elapsed = Date.now() - loadStartTime;
         let remainingTime = 0;
 
@@ -291,15 +338,15 @@
             remainingTime = Math.max(0, MIN_LOADING_MS - elapsed);
         }
 
-        if(!isBackgroundRefresh) {
-            console.log(`定位耗時: ${elapsed}ms, 強制等待: ${remainingTime}ms`);
+        if(!isBackgroundRefresh && remainingTime > 0) {
+            console.log(`[UI] 等待梗圖顯示 (剩餘 ${remainingTime}ms)`);
         }
 
         setTimeout(() => {
             autoLocate(lat, lon);
         }, remainingTime);
     }
-
+    
     function checkDayType() {
         let now = new Date();
         if (now.getHours() < 2) {
@@ -581,4 +628,5 @@
 </script>
 </body>
 </html>
+
 
