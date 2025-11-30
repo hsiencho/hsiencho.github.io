@@ -23,8 +23,7 @@
             --bg-color: #f5f5f5;
             --text-dark: #333;
             --status-red: #d32f2f;
-            /* 1. 選單寬度縮小 */
-            --menu-width: 220px; 
+            --menu-width: 240px; 
         }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; 
@@ -132,9 +131,8 @@
         .station-list { display: none; background: #f9f9f9; padding: 0; margin: 0; list-style: none; }
         .menu-line-item.expanded .station-list { display: block; }
         
-        /* 2. 調整車站列表樣式，加入 Flex 以對齊星星 */
         .station-list li, .favorites-list li {
-            padding: 12px 10px 12px 20px; /* 調整 padding */
+            padding: 12px 10px 12px 20px;
             cursor: pointer;
             border-bottom: 1px solid #eee;
             font-size: 0.95rem;
@@ -145,19 +143,17 @@
         }
         .station-list li:hover, .favorites-list li:hover { background: #eee; color: #000; }
         
-        /* 我的最愛列表 */
         .favorites-list { padding: 0; margin: 0; list-style: none; display: block; }
 
-        /* 星星按鈕樣式 */
         .star-btn {
             font-size: 1.2rem;
             line-height: 1;
             padding: 0 10px;
-            color: #ccc; /* 預設灰色 */
+            color: #ccc;
             transition: color 0.2s, transform 0.1s;
         }
-        .star-btn:active { transform: scale(1.2); }
-        .star-btn.active { color: #ffc107; /* 金色 */ }
+        .star-btn.active { transform: scale(1.2); }
+        .star-btn.active { color: #ffc107; }
 
 
         /* === Station Info === */
@@ -316,7 +312,7 @@
     <div class="side-menu" id="side-menu">
         <div class="menu-header">選單</div>
         <div class="feature-guide" onclick="startTour()">
-            新手導覽
+            <span>💡</span> 新手導覽
         </div>
         <div id="menu-lines-container"></div>
     </div>
@@ -367,7 +363,7 @@
 
     let loadStartTime = 0; 
     let isFirstLoad = true; 
-    let favoriteStations = []; // 儲存最愛車站名稱
+    let favoriteStations = []; 
 
     function getFunLoading() {
         return LOADING_TEXTS[Math.floor(Math.random() * LOADING_TEXTS.length)];
@@ -377,18 +373,15 @@
     // 1. 初始化
     // ==========================================
     window.onload = function() {
-        // 載入 Cookie
-        loadFavorites();
-
+        loadFavorites(); 
         showRandomMeme();
         document.getElementById('ui-station-name').innerText = getFunLoading();
         checkDayType();
-        
-        // 初始化選單 (包含星星邏輯)
         initMenu();
-        
         startLocationProcess();
         initGlobalClickListener();
+
+        // 注意：checkFirstTimeTour 已移動到 autoLocate 內部調用
 
         setInterval(() => {
             console.log("觸發自動重新定位 (60s)...");
@@ -396,58 +389,56 @@
         }, AUTO_REFRESH_SEC * 1000);
     };
 
-    // ==========================================
-    // 2. Cookie 與 最愛邏輯
-    // ==========================================
-    function setCookie(name, value, days) {
-        var expires = "";
-        if (days) {
-            var date = new Date();
-            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-            expires = "; expires=" + date.toUTCString();
+    function checkFirstTimeTour() {
+        // 使用 localStorage 檢查
+        const hasSeen = localStorage.getItem("has_seen_tour");
+        
+        if (!hasSeen) {
+            setTimeout(() => {
+                startTour();
+                // 標記為已看過
+                localStorage.setItem("has_seen_tour", "true");
+            }, 800);
         }
-        document.cookie = name + "=" + (value || "") + expires + "; path=/";
     }
 
-    function getCookie(name) {
-        var nameEQ = name + "=";
-        var ca = document.cookie.split(';');
-        for (var i = 0; i < ca.length; i++) {
-            var c = ca[i];
-            while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
-        }
-        return null;
-    }
-
+    // ==========================================
+    // 2. localStorage 與 最愛邏輯
+    // ==========================================
     function loadFavorites() {
-        const json = getCookie("fav_stations");
-        if (json) {
-            try {
+        try {
+            const json = localStorage.getItem("fav_stations");
+            if (json) {
                 favoriteStations = JSON.parse(json);
-            } catch (e) {
+            } else {
                 favoriteStations = [];
             }
+        } catch (e) {
+            console.error("無法讀取最愛紀錄", e);
+            favoriteStations = [];
         }
     }
 
     function saveFavorites() {
-        setCookie("fav_stations", JSON.stringify(favoriteStations), 365); // 存一年
+        try {
+            localStorage.setItem("fav_stations", JSON.stringify(favoriteStations));
+        } catch (e) {
+            console.error("無法寫入最愛紀錄", e);
+        }
     }
 
-    // 切換收藏狀態
     window.toggleFavorite = function(e, stationName) {
-        e.stopPropagation(); // 阻止事件冒泡 (不要觸發「選擇車站」)
+        e.stopPropagation(); 
         
         const idx = favoriteStations.indexOf(stationName);
         if (idx > -1) {
-            favoriteStations.splice(idx, 1); // 移除
+            favoriteStations.splice(idx, 1); 
         } else {
-            favoriteStations.push(stationName); // 加入
+            favoriteStations.push(stationName); 
         }
         
         saveFavorites();
-        initMenu(); // 重新渲染選單以更新星星和「我的最愛」區塊
+        initMenu(); 
     }
 
     // ==========================================
@@ -470,13 +461,15 @@
         const container = document.getElementById('menu-lines-container');
         container.innerHTML = "";
 
-        // === A. 渲染「我的最愛」區塊 (如果有收藏) ===
+        // === A. 渲染「我的最愛」區塊 ===
         if (favoriteStations.length > 0) {
             const favSection = document.createElement('div');
             favSection.className = 'favorites-section';
             
-            // 找出收藏車站的顏色 (找第一個匹配的路線)
             let favHtml = `
+                <div class="favorites-header">
+                    <span>★</span> 我的最愛
+                </div>
                 <ul class="favorites-list">
             `;
 
@@ -514,7 +507,6 @@
                     </div>
                     <ul class="station-list">
                         ${lineConfig.stations.map(st => {
-                            // 判斷是否收藏
                             const isFav = favoriteStations.includes(st.name);
                             const starChar = isFav ? '★' : '☆';
                             const activeClass = isFav ? 'active' : '';
@@ -633,6 +625,12 @@
         if (isFirstLoad || document.getElementById('ui-station-name').innerText !== bestName) {
             document.getElementById('ui-station-name').innerText = bestName;
             buildCards(bestName);
+            
+            // ★ 修改：在這裡觸發導覽，確保卡片已經建立
+            if (isFirstLoad) {
+                 checkFirstTimeTour();
+            }
+
             isFirstLoad = false;
         } else {
             if (appState.activeCards) appState.activeCards.forEach(c => renderTimes(c));
