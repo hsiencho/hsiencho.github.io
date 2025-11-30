@@ -23,6 +23,8 @@
             --bg-color: #f5f5f5;
             --text-dark: #333;
             --status-red: #d32f2f;
+            /* 1. 選單寬度縮小 */
+            --menu-width: 220px; 
         }
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; 
@@ -44,12 +46,119 @@
             z-index: 100;
             transition: background-color 0.4s ease; 
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         .header h1 { margin: 0; font-size: 1.1rem; }
+        
+        .menu-btn {
+            position: absolute;
+            left: 15px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0 10px;
+            line-height: 1;
+        }
+
         .day-badge { 
             position: absolute; right: 15px; top: 50%; transform: translateY(-50%);
             background: rgba(255,255,255,0.25); padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; 
         }
+
+        /* === Side Menu === */
+        .menu-backdrop {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 998;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .menu-backdrop.active { opacity: 1; pointer-events: auto; }
+
+        .side-menu {
+            position: fixed; top: 0; left: calc(var(--menu-width) * -1);
+            width: var(--menu-width); height: 100%;
+            background: #fff; z-index: 999;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+            display: flex; flex-direction: column;
+        }
+        .side-menu.open { left: 0; }
+
+        .menu-header {
+            padding: 20px;
+            background: #f0f0f0;
+            font-weight: bold;
+            font-size: 1.2rem;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .feature-guide {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            background: #fff;
+            color: #007bff;
+            font-weight: bold;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .feature-guide:hover { background: #f9f9f9; }
+
+        /* 我的最愛區塊樣式 */
+        .favorites-section {
+            border-bottom: 1px solid #eee;
+            background: #fffaf0; /* 淡黃色背景區隔 */
+        }
+        .favorites-header {
+            padding: 15px 20px;
+            font-weight: bold;
+            color: #d48806;
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .menu-line-item { border-bottom: 1px solid #eee; }
+        .line-header {
+            padding: 15px 20px;
+            cursor: pointer;
+            display: flex; justify-content: space-between; align-items: center;
+            font-weight: bold;
+            background: #fff;
+        }
+        .line-header:hover { background: #fafafa; }
+        .line-indicator { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 10px; }
+        .arrow { transition: transform 0.3s; font-size: 0.8rem; color: #999; }
+        .menu-line-item.expanded .arrow { transform: rotate(90deg); }
+
+        .station-list { display: none; background: #f9f9f9; padding: 0; margin: 0; list-style: none; }
+        .menu-line-item.expanded .station-list { display: block; }
+        
+        /* 2. 調整車站列表樣式，加入 Flex 以對齊星星 */
+        .station-list li, .favorites-list li {
+            padding: 12px 10px 12px 20px; /* 調整 padding */
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            font-size: 0.95rem;
+            color: #555;
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+        }
+        .station-list li:hover, .favorites-list li:hover { background: #eee; color: #000; }
+        
+        /* 我的最愛列表 */
+        .favorites-list { padding: 0; margin: 0; list-style: none; display: block; }
+
+        /* 星星按鈕樣式 */
+        .star-btn {
+            font-size: 1.2rem;
+            line-height: 1;
+            padding: 0 10px;
+            color: #ccc; /* 預設灰色 */
+            transition: color 0.2s, transform 0.1s;
+        }
+        .star-btn:active { transform: scale(1.2); }
+        .star-btn.active { color: #ffc107; /* 金色 */ }
+
 
         /* === Station Info === */
         .station-info-bar {
@@ -76,7 +185,7 @@
         }
         .station-id-btn:active { transform: scale(0.95); opacity: 0.8; }
 
-        /* === Scroller === */
+        /* === Scroller & Cards === */
         .cards-scroller {
             display: flex;
             flex-wrap: nowrap;
@@ -89,11 +198,10 @@
             gap: 15px; 
             -webkit-overflow-scrolling: touch; 
             scroll-behavior: smooth;
-            min-height: 60vh; /* 確保有高度顯示梗圖 */
+            min-height: 60vh;
         }
         .cards-scroller::-webkit-scrollbar { display: none; }
 
-        /* === Cards === */
         .line-card {
             flex: 0 0 min(85vw, 400px);
             max-width: 400px;
@@ -133,10 +241,9 @@
         .dest-tag { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
         .tag-huilong { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
         .tag-luzhou { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
-
         .empty-msg { padding: 40px; text-align: center; color: #aaa; }
 
-        /* === 梗圖專用樣式 === */
+        /* === Meme === */
         .meme-container {
             width: 100%;
             display: flex;
@@ -146,26 +253,76 @@
             margin-top: 20px;
             text-align: center;
         }
-        .meme-title {
-            font-size: 1rem;
-            color: #666;
-            margin-bottom: 10px;
+        .meme-title { font-size: 1rem; color: #666; margin-bottom: 10px; font-weight: bold; }
+        .meme-img { max-width: 90%; max-height: 50vh; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); object-fit: contain; background: #eee; min-height: 200px; }
+
+        /* === Tour Overlay === */
+        .tour-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 2000;
+            pointer-events: auto;
+            display: none;
+            cursor: pointer;
+        }
+        .tour-overlay.active { display: block; }
+
+        .tour-spotlight {
+            position: absolute;
+            border-radius: 8px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.75);
+            transition: all 0.4s ease;
+            pointer-events: none;
+            border: 2px solid #ffd700;
+        }
+        
+        .tour-text-box {
+            position: absolute;
+            color: white;
+            max-width: 80%;
+            width: 300px;
+            font-size: 1.1rem;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+            transition: all 0.4s ease;
             font-weight: bold;
         }
-        .meme-img {
-            max-width: 90%;
-            max-height: 50vh;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            object-fit: contain;
-            background: #eee;
-            min-height: 200px;
+        .tour-arrow { font-size: 1.5rem; display: block; margin: 5px 0; color: #ffd700; }
+        
+        .tour-tap-hint {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.6);
+            font-size: 0.9rem;
+            pointer-events: none;
         }
+
     </style>
 </head>
 <body>
 
+    <div class="tour-overlay" id="tour-overlay" onclick="nextTourStep()">
+        <div class="tour-spotlight" id="tour-spotlight"></div>
+        <div class="tour-text-box" id="tour-text-box">
+            <span id="tour-content"></span>
+        </div>
+        <div class="tour-tap-hint">點擊任意處繼續 (Tap anywhere to continue)</div>
+    </div>
+
+    <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
+    <div class="side-menu" id="side-menu">
+        <div class="menu-header">選單</div>
+        <div class="feature-guide" onclick="startTour()">
+            新手導覽
+        </div>
+        <div id="menu-lines-container"></div>
+    </div>
+
     <div class="header" id="ui-header">
+        <div class="menu-btn" onclick="toggleMenu()">☰</div>
         <h1 id="ui-line-name">捷運時刻表</h1>
         <div class="day-badge" id="day-type-badge">...</div>
     </div>
@@ -189,46 +346,50 @@
     // ==========================================
     // 設定
     // ==========================================
-    const MIN_LOADING_MS = 3000; // 最低顯示時間 (毫秒)，預設 1 秒
-    const AUTO_REFRESH_SEC = 60; // 自動重新定位秒數
+    const MIN_LOADING_MS = 3000; 
+    const AUTO_REFRESH_SEC = 60; 
 
-    const LOADING_TEXTS = [
-        "正在幫你追捷運...",
-        "正在計算要不要用跑的...",
-        "正在跟站長討時刻表...",
-        "正在定位你的悠遊卡...",
-        "衛星正在瞄準車站...",
-        "捷運來接你了喔~~",
-        "我買TPASS的時候\n沒跟我說會看到這個",
-        "再等一下，車還沒開走..."
+    const MENU_MAPPING = [
+        { key: 'orange', label: '中和新蘆線' },
+        { key: 'red',    label: '淡水信義線' },
+        { key: 'blue',   label: '板南線' },
+        { key: 'green',  label: '松山新店線' },
+        { key: 'brown',  label: '文湖線' },
+        { key: 'yellow', label: '環狀線' },
+        { key: 'airport',label: '機場捷運' }
     ];
 
-    let loadStartTime = 0; // 記錄開始定位的時間
-    let isFirstLoad = true; // 標記是否為第一次載入
+    const LOADING_TEXTS = [
+        "正在幫你追捷運...", "正在計算要不要用跑的...", "正在跟站長討時刻表...",
+        "正在定位你的悠遊卡...", "衛星正在瞄準車站...", "捷運來接你了喔~~",
+        "我買TPASS的時候\n沒跟我說會看到這個", "再等一下，車還沒開走..."
+    ];
+
+    let loadStartTime = 0; 
+    let isFirstLoad = true; 
+    let favoriteStations = []; // 儲存最愛車站名稱
 
     function getFunLoading() {
-        const idx = Math.floor(Math.random() * LOADING_TEXTS.length);
-        return LOADING_TEXTS[idx];
+        return LOADING_TEXTS[Math.floor(Math.random() * LOADING_TEXTS.length)];
     }
 
     // ==========================================
     // 1. 初始化
     // ==========================================
     window.onload = function() {
-        // 1. 顯示梗圖
-        showRandomMeme();
+        // 載入 Cookie
+        loadFavorites();
 
-        // 2. 更新文字
+        showRandomMeme();
         document.getElementById('ui-station-name').innerText = getFunLoading();
         checkDayType();
-
-        // 3. 啟動第一次定位流程
-        startLocationProcess();
         
-        // 4. 啟動全域點擊監聽
+        // 初始化選單 (包含星星邏輯)
+        initMenu();
+        
+        startLocationProcess();
         initGlobalClickListener();
 
-        // 5. 設定每 60 秒重新定位
         setInterval(() => {
             console.log("觸發自動重新定位 (60s)...");
             startLocationProcess(true); 
@@ -236,187 +397,245 @@
     };
 
     // ==========================================
-    // 2. 顯示隨機梗圖
+    // 2. Cookie 與 最愛邏輯
     // ==========================================
-    function showRandomMeme() {
-        // 檢查全域變數 MEME_DATA 是否存在 (由 meme_data.js 提供)
-        if (typeof window.MEME_DATA !== 'undefined' && Array.isArray(window.MEME_DATA) && window.MEME_DATA.length > 0) {
-            const randomUrl = window.MEME_DATA[Math.floor(Math.random() * window.MEME_DATA.length)];
-            document.getElementById('meme-display').src = randomUrl;
-        } else {
-            document.getElementById('meme-display').alt = "沒有找到梗圖資料";
-            console.warn("MEME_DATA is undefined. Make sure meme_data is loaded correctly.");
+    function setCookie(name, value, days) {
+        var expires = "";
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "") + expires + "; path=/";
+    }
+
+    function getCookie(name) {
+        var nameEQ = name + "=";
+        var ca = document.cookie.split(';');
+        for (var i = 0; i < ca.length; i++) {
+            var c = ca[i];
+            while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+        }
+        return null;
+    }
+
+    function loadFavorites() {
+        const json = getCookie("fav_stations");
+        if (json) {
+            try {
+                favoriteStations = JSON.parse(json);
+            } catch (e) {
+                favoriteStations = [];
+            }
         }
     }
 
-    // ==========================================
-    // 3. 競速式定位流程 (Concurrent Race: GPS > Network > Cache)
-    // ==========================================
-    
-    // 定義優先級 (數字越大越重要)
-    const PRIORITY = {
-        NONE: 0,
-        CACHE: 1,
-        NETWORK: 2,
-        GPS: 3
-    };
+    function saveFavorites() {
+        setCookie("fav_stations", JSON.stringify(favoriteStations), 365); // 存一年
+    }
 
-    let currentPriorityLevel = 0; // 目前顯示的資料等級
+    // 切換收藏狀態
+    window.toggleFavorite = function(e, stationName) {
+        e.stopPropagation(); // 阻止事件冒泡 (不要觸發「選擇車站」)
+        
+        const idx = favoriteStations.indexOf(stationName);
+        if (idx > -1) {
+            favoriteStations.splice(idx, 1); // 移除
+        } else {
+            favoriteStations.push(stationName); // 加入
+        }
+        
+        saveFavorites();
+        initMenu(); // 重新渲染選單以更新星星和「我的最愛」區塊
+    }
 
-    // 啟動定位 (同時發射三種策略)
-    function startLocationProcess(isBackgroundRefresh = false) {
-        if (!isBackgroundRefresh) {
-            loadStartTime = Date.now();
-            currentPriorityLevel = PRIORITY.NONE; // 重置優先級
+    // ==========================================
+    // 3. 側邊選單與定位邏輯
+    // ==========================================
+    function toggleMenu() {
+        const menu = document.getElementById('side-menu');
+        const backdrop = document.getElementById('menu-backdrop');
+        
+        if (menu.classList.contains('open')) {
+            menu.classList.remove('open');
+            backdrop.classList.remove('active');
+        } else {
+            menu.classList.add('open');
+            backdrop.classList.add('active');
+        }
+    }
+
+    function initMenu() {
+        const container = document.getElementById('menu-lines-container');
+        container.innerHTML = "";
+
+        // === A. 渲染「我的最愛」區塊 (如果有收藏) ===
+        if (favoriteStations.length > 0) {
+            const favSection = document.createElement('div');
+            favSection.className = 'favorites-section';
+            
+            // 找出收藏車站的顏色 (找第一個匹配的路線)
+            let favHtml = `
+                <ul class="favorites-list">
+            `;
+
+            favoriteStations.forEach(name => {
+                favHtml += `
+                    <li onclick="selectStation('${name}')">
+                        <span>${name}</span>
+                        <span class="star-btn active" onclick="toggleFavorite(event, '${name}')">★</span>
+                    </li>
+                `;
+            });
+
+            favHtml += `</ul>`;
+            favSection.innerHTML = favHtml;
+            container.appendChild(favSection);
         }
 
-        console.log("=== 開始多重定位競速 ===");
+        // === B. 渲染所有路線 ===
+        MENU_MAPPING.forEach(item => {
+            let configKey = item.key;
+            if (!METRO_CONFIG[configKey] && configKey === 'airport') configKey = 't'; 
+            
+            const lineConfig = METRO_CONFIG[configKey];
+            if (lineConfig) {
+                const lineItem = document.createElement('div');
+                lineItem.className = 'menu-line-item';
+                
+                const headerHtml = `
+                    <div class="line-header" onclick="toggleLine(this)">
+                        <div style="display:flex; align-items:center;">
+                            <span class="line-indicator" style="background-color: ${lineConfig.color}"></span>
+                            ${item.label}
+                        </div>
+                        <span class="arrow">▶</span>
+                    </div>
+                    <ul class="station-list">
+                        ${lineConfig.stations.map(st => {
+                            // 判斷是否收藏
+                            const isFav = favoriteStations.includes(st.name);
+                            const starChar = isFav ? '★' : '☆';
+                            const activeClass = isFav ? 'active' : '';
 
-        // 1. 發射快取策略 (Lv1)
-        runStrategy(PRIORITY.CACHE, {
-            enableHighAccuracy: false,
-            timeout: 1000,
-            maximumAge: Infinity
-        }, isBackgroundRefresh);
+                            return `
+                                <li onclick="selectStation('${st.name}')">
+                                    <span>${st.name}</span>
+                                    <span class="star-btn ${activeClass}" onclick="toggleFavorite(event, '${st.name}')">${starChar}</span>
+                                </li>
+                            `;
+                        }).join('')}
+                    </ul>
+                `;
+                lineItem.innerHTML = headerHtml;
+                container.appendChild(lineItem);
+            }
+        });
+    }
 
-        // 2. 發射網路策略 (Lv2)
-        runStrategy(PRIORITY.NETWORK, {
-            enableHighAccuracy: false,
-            timeout: 10000,
-            maximumAge: 0
-        }, isBackgroundRefresh);
+    window.toggleLine = function(element) {
+        element.parentElement.classList.toggle('expanded');
+    }
 
-        // 3. 發射 GPS 策略 (Lv3) - 只有這個會無限重試
+    window.selectStation = function(name) {
+        document.getElementById('status-text').innerHTML = "手動選擇模式";
+        document.getElementById('ui-station-name').innerText = name;
+        buildCards(name);
+        toggleMenu();
+        currentPriorityLevel = 99; 
+    }
+
+    // ==========================================
+    // 4. 定位核心
+    // ==========================================
+    const PRIORITY = { NONE: 0, CACHE: 1, NETWORK: 2, GPS: 3 };
+    let currentPriorityLevel = 0; 
+
+    function startLocationProcess(isBackgroundRefresh = false) {
+        if (currentPriorityLevel === 99 && isBackgroundRefresh) return;
+
+        if (!isBackgroundRefresh) {
+            loadStartTime = Date.now();
+            currentPriorityLevel = PRIORITY.NONE; 
+        }
+
+        runStrategy(PRIORITY.CACHE, { timeout: 1000, maximumAge: Infinity }, isBackgroundRefresh);
+        runStrategy(PRIORITY.NETWORK, { timeout: 10000, maximumAge: 0 }, isBackgroundRefresh);
         runGPSStrategy(isBackgroundRefresh);
     }
 
-    // 通用定位執行器 (給快取和網路用)
     function runStrategy(level, options, isBackgroundRefresh) {
         if (!navigator.geolocation) return;
-
         navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                tryUpdateLocation(pos, level, isBackgroundRefresh);
-            },
-            (err) => {
-                console.log(`[等級${level}] 定位失敗或逾時:`, err.message);
-            },
+            (pos) => { tryUpdateLocation(pos, level, isBackgroundRefresh); },
+            (err) => { console.log(`[等級${level}] 失敗:`, err.message); },
             options
         );
     }
 
-    // GPS 專用執行器 (含重試邏輯)
     function runGPSStrategy(isBackgroundRefresh) {
         if (!navigator.geolocation) return;
-
         navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                tryUpdateLocation(pos, PRIORITY.GPS, isBackgroundRefresh);
-            },
+            (pos) => { tryUpdateLocation(pos, PRIORITY.GPS, isBackgroundRefresh); },
             (err) => {
-                console.warn("[等級3] GPS 定位暫時失敗:", err.message);
-
-                // 只有被拒絕時才放棄，否則持續重試
                 if (err.code !== err.PERMISSION_DENIED) {
-                    setTimeout(() => {
-                        // 遞迴重試，保持 GPS 監聽
-                        runGPSStrategy(isBackgroundRefresh);
-                    }, 2000);
+                    setTimeout(() => { runGPSStrategy(isBackgroundRefresh); }, 2000);
                 } else {
                     document.getElementById('status-text').innerHTML = "<span style='color:red'>定位被拒絕</span>";
-                    handleLocationSuccess(25.0463, 121.5175, isBackgroundRefresh);
+                    handleLocationSuccess(25.0463, 121.5175, isBackgroundRefresh); // 預設北車
                 }
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 30000,
-                maximumAge: 0
-            }
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
         );
     }
 
-    // 核心鎖定邏輯：決定是否更新 UI
     function tryUpdateLocation(pos, level, isBackgroundRefresh) {
-        // ★ 關鍵判斷：只有當 新來的等級 > 目前等級 時才更新
-        // 例如：現在是 Network(2)，如果 Cache(1) 比較晚回應，這裡會擋掉，不讓畫面變回舊資料
+        if (currentPriorityLevel === 99) return;
         if (level > currentPriorityLevel) {
-            
-            console.log(`[更新成功] 來源等級: ${level} (覆蓋舊等級: ${currentPriorityLevel})`);
-            currentPriorityLevel = level; // 更新目前鎖定等級
-            
+            currentPriorityLevel = level;
             handleLocationSuccess(pos.coords.latitude, pos.coords.longitude, isBackgroundRefresh);
-        } else {
-            console.log(`[忽略更新] 來源等級: ${level} 低於目前等級: ${currentPriorityLevel}`);
         }
     }
 
-    function handleLocationSuccess(lat, lon, isBackgroundRefresh, isError = false) {
-        // 計算是否需要等待梗圖時間
+    function handleLocationSuccess(lat, lon, isBackgroundRefresh) {
         const elapsed = Date.now() - loadStartTime;
         let remainingTime = 0;
-
-        // 只有第一次載入需要算延遲
-        if (!isBackgroundRefresh) {
-            remainingTime = Math.max(0, MIN_LOADING_MS - elapsed);
-        }
-
-        if(!isBackgroundRefresh && remainingTime > 0) {
-            console.log(`[UI] 梗圖保護中，延遲 ${remainingTime}ms 後顯示結果`);
-        }
-
-        setTimeout(() => {
-            autoLocate(lat, lon);
-        }, remainingTime);
+        if (!isBackgroundRefresh) remainingTime = Math.max(0, MIN_LOADING_MS - elapsed);
+        setTimeout(() => { autoLocate(lat, lon); }, remainingTime);
     }
     
     function checkDayType() {
         let now = new Date();
-        if (now.getHours() < 2) {
-            now.setDate(now.getDate() - 1);
-        }
+        if (now.getHours() < 2) now.setDate(now.getDate() - 1);
         const d = now.getDay();
         const isWeekend = (d === 0 || d === 6);
         appState.dayType = isWeekend ? 'weekend' : 'weekday';
         document.getElementById('day-type-badge').innerText = isWeekend ? "假日時刻" : "平日時刻";
     }
 
-    // ==========================================
-    // 4. 定位邏輯與渲染
-    // ==========================================
     function autoLocate(lat, lon) {
         let minD = Infinity;
         let bestName = "";
 
-        // 找最近車站名稱
         for (const config of Object.values(METRO_CONFIG)) {
             config.stations.forEach(st => {
                 const d = getDist(lat, lon, st.lat, st.lon);
                 if (d < minD) { minD = d; bestName = st.name; }
             });
         }
-        if (minD > 1) { minD *= 1.18 };
-
-        // 計算數據
-        const distVal = minD.toFixed(1);
-        const walkMin = Math.ceil(minD * 14); 
-        const bikeMin = Math.ceil(minD * 6); 
+        if (minD > 1) minD *= 1.18;
 
         document.getElementById('status-text').innerHTML = 
-            `距離 ${distVal} km<br>` +
-            `<span style="font-size: 0.85em; opacity: 0.9;">步行約 ${walkMin} 分 / 車程約 ${bikeMin} 分</span>`;
+            `距離 ${minD.toFixed(1)} km<br>` +
+            `<span style="font-size: 0.85em; opacity: 0.9;">步行約 ${Math.ceil(minD*14)} 分 / 車程約 ${Math.ceil(minD*6)} 分</span>`;
 
-        // 判斷是否需要重建 UI
-        const currentStation = document.getElementById('ui-station-name').innerText;
-        
-        if (isFirstLoad || currentStation !== bestName) {
+        if (isFirstLoad || document.getElementById('ui-station-name').innerText !== bestName) {
             document.getElementById('ui-station-name').innerText = bestName;
             buildCards(bestName);
             isFirstLoad = false;
         } else {
-            // 車站沒變，只更新現有卡片的時間
-            if (appState.activeCards) {
-                appState.activeCards.forEach(c => renderTimes(c));
-            }
+            if (appState.activeCards) appState.activeCards.forEach(c => renderTimes(c));
         }
     }
 
@@ -426,25 +645,26 @@
         return 2 * R * Math.asin(Math.sqrt(a));
     }
 
+    function showRandomMeme() {
+        if (typeof window.MEME_DATA !== 'undefined' && Array.isArray(window.MEME_DATA) && window.MEME_DATA.length > 0) {
+            document.getElementById('meme-display').src = window.MEME_DATA[Math.floor(Math.random() * window.MEME_DATA.length)];
+        }
+    }
+
     // ==========================================
-    // 5. 建立卡片 (核心)
+    // 5. 建立卡片
     // ==========================================
     function buildCards(stationName) {
         const scroller = document.getElementById('scroller');
         const badgesDiv = document.getElementById('ui-badges');
-        
-        // 清空 Scroller
         scroller.innerHTML = "";
         badgesDiv.innerHTML = "";
         appState.activeCards = [];
 
-        // 1. 找出所有經過此站的路線
         const matched = [];
         for (const [key, config] of Object.entries(METRO_CONFIG)) {
             const st = config.stations.find(s => s.name === stationName);
-            if (st) {
-                matched.push({ key, config, st });
-            }
+            if (st) matched.push({ key, config, st });
         }
 
         if (matched.length === 0) {
@@ -452,23 +672,12 @@
             return;
         }
 
-        // ★★★ 判斷是否需要簡化徽章 (超過 3 個路線時) ★★★
         const isCrowded = matched.length > 2;
 
-        // 2. 建立 DOM
-        matched.forEach((item, idx) => {
-            // A. 左上角徽章
+        matched.forEach((item) => {
             const badge = document.createElement('div');
             badge.className = 'station-id-btn';
-            
-            // ★★★ 簡化邏輯 ★★★
-            if (isCrowded) {
-                // 使用 Regex 把數字去掉，只留英文 (例如 "R10" -> "R", "BL12" -> "BL")
-                badge.innerText = item.st.id.replace(/[0-9]/g, '');
-            } else {
-                badge.innerText = item.st.id;
-            }
-            
+            badge.innerText = isCrowded ? item.st.id.replace(/[0-9]/g, '') : item.st.id;
             badge.style.backgroundColor = item.config.color;
             badge.onclick = () => {
                 const target = document.getElementById('card-' + item.key);
@@ -476,37 +685,24 @@
             };
             badgesDiv.appendChild(badge);
 
-            // B. 卡片
             const card = document.createElement('div');
             card.className = 'line-card';
             card.id = 'card-' + item.key;
             card.dataset.color = item.config.color;
             card.style.borderColor = item.config.color;
 
-            // 預設方向
             let dirId = item.config.directions[0].id;
             if (item.config.directions[0].excludeStations.includes(stationName)) {
                 dirId = item.config.directions[1].id;
             }
 
             const cardState = {
-                lineKey: item.key,
-                config: item.config,
-                station: item.st,
-                currentDir: dirId,
-                dom: card
+                lineKey: item.key, config: item.config, station: item.st, currentDir: dirId, dom: card
             };
             appState.activeCards.push(cardState);
 
-            card.innerHTML = `
-                <div class="direction-buttons" id="btns-${item.key}"></div>
-                <ul class="time-list" id="list-${item.key}">
-                    <li class="empty-msg">${getFunLoading()}</li>
-                </ul>
-            `;
-            
+            card.innerHTML = `<div class="direction-buttons"></div><ul class="time-list"><li class="empty-msg">${getFunLoading()}</li></ul>`;
             scroller.appendChild(card);
-
             renderButtons(cardState);
             renderTimes(cardState);
         });
@@ -514,31 +710,23 @@
         initObserver();
     }
 
-    // ==========================================
-    // 6. 渲染按鈕與時間
-    // ==========================================
     function renderButtons(cardState) {
         const div = cardState.dom.querySelector('.direction-buttons');
         div.innerHTML = "";
-
         cardState.config.directions.forEach(d => {
             if (d.excludeStations.includes(cardState.station.name)) return;
-
             let label = d.label;
             if (cardState.lineKey === 'orange' && d.id === 'north') {
                 if (cardState.station.branch === 'huilong') label = "往 迴龍";
                 else if (cardState.station.branch === 'luzhou') label = "往 蘆洲";
             }
-
             const btn = document.createElement('button');
             btn.className = 'btn';
             btn.innerText = label;
-            
             if (d.id === cardState.currentDir) {
                 btn.classList.add('active');
                 btn.style.backgroundColor = cardState.config.color;
             }
-
             btn.onclick = () => {
                 cardState.currentDir = d.id;
                 renderButtons(cardState);
@@ -551,31 +739,23 @@
     function renderTimes(cardState) {
         const ul = cardState.dom.querySelector('.time-list');
         ul.innerHTML = "";
-
         const dirConfig = cardState.config.directions.find(d => d.id === cardState.currentDir);
         if (!dirConfig) return;
-
         const sources = dirConfig.sources[appState.dayType];
         if (!sources) { ul.innerHTML="<li>無資料設定</li>"; return; }
 
         let trains = [];
-        
         sources.forEach(varName => {
-            if (typeof window[varName] !== 'undefined' && window[varName][cardState.station.id]) {
+            if (window[varName] && window[varName][cardState.station.id]) {
                 const raw = window[varName][cardState.station.id].times;
-                
                 let type = "N";
                 if (varName.includes("HUILONG")) type = "H";
                 if (varName.includes("LUZHOU")) type = "L";
-
                 raw.forEach(t => trains.push({ time: t, type }));
             }
         });
 
-        if (trains.length === 0) {
-            ul.innerHTML = "<li class='empty-msg'>很抱歉，未取得該路線時刻</li>";
-            return;
-        }
+        if (trains.length === 0) { ul.innerHTML = "<li class='empty-msg'>未取得時刻</li>"; return; }
 
         const unique = new Map();
         trains.forEach(t => unique.set(t.time, t));
@@ -594,135 +774,143 @@
         const now = new Date();
         let nowMins = now.getHours() * 60 + now.getMinutes();
         if (nowMins < 120) nowMins += 1440;
-
         const upcoming = sorted.filter(t => t.time >= nowMins).slice(0, 8);
 
-        if (upcoming.length === 0) {
-            ul.innerHTML = "<li class='empty-msg'>本日已無發車</li>";
-            return;
-        }
+        if (upcoming.length === 0) { ul.innerHTML = "<li class='empty-msg'>本日已無發車</li>"; return; }
 
         upcoming.forEach(item => {
             let h = Math.floor(item.time / 60);
             let m = item.time % 60;
             if(h>=24) h-=24;
             const timeStr = `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`;
-
             let diff = item.time - nowMins;
             let status = (diff<=0) ? "進站中" : `約 ${diff} 分`;
             let isRed = (diff<=10 || diff<=0);
-
             let tag = "";
             if (cardState.lineKey === 'orange' && cardState.station.branch === 'common' && cardState.currentDir === 'north') {
                 if(item.type==='H') tag = `<span class="dest-tag tag-huilong">往迴龍</span>`;
                 else if(item.type==='L') tag = `<span class="dest-tag tag-luzhou">往蘆洲</span>`;
             }
-
             const li = document.createElement('li');
             li.className = 'time-item';
-            li.innerHTML = `
-                <div>
-                    <span class="time-val">${timeStr}</span>
-                    ${tag}
-                </div>
-                <span class="time-status ${isRed ? 'status-urgent' : ''}">${status}</span>
-            `;
+            li.innerHTML = `<div><span class="time-val">${timeStr}</span>${tag}</div><span class="time-status ${isRed ? 'status-urgent' : ''}">${status}</span>`;
             ul.appendChild(li);
         });
     }
 
     // ==========================================
-    // 7. 滑動監聽
+    // 6. 新手引導邏輯
     // ==========================================
+    let currentTourStep = 0;
+    const TOUR_STEPS = [
+        { target: '#ui-station-name', text: "這裡顯示距離您目前位置<br>「最近的捷運站」<br>會隨定位自動更新", position: 'bottom' },
+        { target: '#ui-badges', text: "如果此站有轉乘路線<br>點擊上方標籤可切換查看", position: 'bottom' },
+        { target: '.line-card', text: "點擊螢幕左右兩側或滑動<br>也可以切換不同路線卡片喔！", position: 'top' },
+        { target: '.direction-buttons', text: "點擊這裡切換行駛方向", position: 'top' }
+    ];
+
+    function startTour() {
+        const menu = document.getElementById('side-menu');
+        const backdrop = document.getElementById('menu-backdrop');
+        menu.classList.remove('open');
+        backdrop.classList.remove('active');
+
+        currentTourStep = 0;
+        document.getElementById('tour-overlay').classList.add('active');
+        document.body.style.overflow = 'hidden'; 
+        renderTourStep();
+    }
+
+    function renderTourStep() {
+        const step = TOUR_STEPS[currentTourStep];
+        const spotlight = document.getElementById('tour-spotlight');
+        const textBox = document.getElementById('tour-text-box');
+        const content = document.getElementById('tour-content');
+
+        let targetEl = document.querySelector(step.target);
+        if (!targetEl || targetEl.offsetParent === null) {
+            nextTourStep();
+            return;
+        }
+
+        targetEl.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' });
+        const rect = targetEl.getBoundingClientRect();
+
+        spotlight.style.width = rect.width + 'px';
+        spotlight.style.height = rect.height + 'px';
+        spotlight.style.top = rect.top + 'px';
+        spotlight.style.left = rect.left + 'px';
+
+        let arrowHtml = step.position === 'top' ? '<span class="tour-arrow">▼</span>' : '<span class="tour-arrow">▲</span>';
+        let textHtml = step.text;
+        
+        if (step.position === 'top') {
+            content.innerHTML = textHtml + "<br>" + arrowHtml;
+        } else {
+            content.innerHTML = arrowHtml + "<br>" + textHtml;
+        }
+
+        let textTop = 0;
+        if (step.position === 'top') {
+            textTop = rect.top - 100;
+        } else {
+            textTop = rect.bottom + 10;
+        }
+        
+        let textLeft = rect.left + (rect.width / 2) - 150; 
+        if (textLeft < 10) textLeft = 10;
+        if (textLeft + 300 > window.innerWidth) textLeft = window.innerWidth - 310;
+
+        textBox.style.top = textTop + 'px';
+        textBox.style.left = textLeft + 'px';
+    }
+
+    function nextTourStep() {
+        currentTourStep++;
+        if (currentTourStep >= TOUR_STEPS.length) {
+            document.getElementById('tour-overlay').classList.remove('active');
+            document.body.style.overflow = '';
+        } else {
+            renderTourStep();
+        }
+    }
+
     function initObserver() {
         const header = document.getElementById('ui-header');
-        
         const obs = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    const color = entry.target.dataset.color;
-                    header.style.backgroundColor = color;
+                    header.style.backgroundColor = entry.target.dataset.color;
                 }
             });
-        }, { 
-            root: document.getElementById('scroller'), 
-            threshold: 0.55 
-        });
-
+        }, { root: document.getElementById('scroller'), threshold: 0.55 });
         document.querySelectorAll('.line-card').forEach(c => obs.observe(c));
     }
 
-    // ==========================================
-    // 8. 全域點擊切換 (螢幕左右 1/3)
-    // ==========================================
     function initGlobalClickListener() {
         document.addEventListener('click', (e) => {
-            // 1. 基本排除 (Header, Info Bar, Footer)
-            if (e.target.closest('.header') || 
-                e.target.closest('.station-info-bar') || 
-                e.target.closest('.footer')) {
-                return;
-            }
-
-            // 取得所有卡片
+            if (e.target.closest('.header') || e.target.closest('.station-info-bar') || e.target.closest('.side-menu') || e.target.closest('.menu-backdrop') || e.target.closest('.tour-overlay')) return;
             const cards = Array.from(document.querySelectorAll('.line-card'));
             if (cards.length === 0) return;
-
-            // 2. 找出目前「正中間」是哪一張卡片
             const screenCenterX = window.innerWidth / 2;
             let closestCard = null;
             let minDiff = Infinity;
-
             cards.forEach(card => {
                 const rect = card.getBoundingClientRect();
-                const cardCenterX = rect.left + rect.width / 2;
-                const diff = Math.abs(cardCenterX - screenCenterX);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closestCard = card;
-                }
+                const diff = Math.abs((rect.left + rect.width / 2) - screenCenterX);
+                if (diff < minDiff) { minDiff = diff; closestCard = card; }
             });
-
             if (!closestCard) return;
-
-            // 找出這張卡片裡的按鈕區域
             const btnContainer = closestCard.querySelector('.direction-buttons');
-            if (btnContainer) {
-                const btnRect = btnContainer.getBoundingClientRect();
-                
-                // 如果點擊的高度 (clientY) 小於或等於 按鈕的底部 (bottom)
-                // 代表點在按鈕上面或更上面的區域 -> 不執行切換
-                if (e.clientY <= btnRect.bottom) {
-                    return; 
-                }
-            }
-
+            if (btnContainer && e.clientY <= btnContainer.getBoundingClientRect().bottom) return;
             const currentIndex = cards.indexOf(closestCard);
-
-            // 4. 判斷點擊位置 (左 1/3 或 右 1/3)
-            const clickX = e.clientX;
-            const screenWidth = window.innerWidth;
-            const threshold = screenWidth / 3;
-
-            if (clickX < threshold) {
-                // --- 點擊螢幕左側 (上一張) ---
-                if (currentIndex > 0) {
-                    cards[currentIndex - 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                }
-            } else if (clickX > (screenWidth - threshold)) {
-                // --- 點擊螢幕右側 (下一張) ---
-                if (currentIndex < cards.length - 1) {
-                    cards[currentIndex + 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                }
-            }
+            if (e.clientX < window.innerWidth / 3 && currentIndex > 0) cards[currentIndex - 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            else if (e.clientX > (window.innerWidth / 3 * 2) && currentIndex < cards.length - 1) cards[currentIndex + 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
         });
     }
 
-    // 倒數計時自動更新
     setInterval(() => {
-        if (appState && appState.activeCards && appState.activeCards.length > 0) {
-            appState.activeCards.forEach(c => renderTimes(c));
-        }
+        if (appState && appState.activeCards) appState.activeCards.forEach(c => renderTimes(c));
     }, 10000);
 
 </script>
