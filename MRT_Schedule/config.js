@@ -276,7 +276,7 @@ const METRO_CONFIG = {
     // ==========================================
     "yellow": {
         name: "環狀線",
-        color: "#ffdb00", 
+        color: "#e6cc26ff", 
         directions: [
             { 
                 id: "east", 
