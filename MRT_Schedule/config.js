@@ -323,26 +323,58 @@ const METRO_CONFIG = {
         color: "#8246af",
         directions: [
             { 
+                // 北上 (往 A1 台北車站)
+                // 對應爬蟲變數中的 NORTH
                 id: "inbound", 
                 label: "往 台北車站", 
                 sources: {
-                    weekday: ["MRT_DATA_TPE_MAIN_WD"],
-                    weekend: ["MRT_DATA_TPE_MAIN_WE"]
+                    weekday: [
+                        "MRT_TY_WD_NORTH_EXPRESS",          // 直達車
+                        "MRT_TY_WD_NORTH_EXPRESS_PLUS",     // 尖峰增停直達車
+                        "MRT_TY_WD_NORTH_COMMUTER",         // 普通車
+                        "MRT_TY_WD_NORTH_COMMUTER_SKIP",    // 尖峰跳站普通車
+                        "MRT_TY_WD_NORTH_AIRPORT_SERVICE",  // 機場加班車
+                        "MRT_TY_WD_NORTH_OTHER"             // 其他
+                    ],
+                    weekend: [
+                        "MRT_TY_WE_NORTH_EXPRESS",
+                        "MRT_TY_WE_NORTH_EXPRESS_PLUS",
+                        "MRT_TY_WE_NORTH_COMMUTER",
+                        "MRT_TY_WE_NORTH_COMMUTER_SKIP",
+                        "MRT_TY_WE_NORTH_AIRPORT_SERVICE",
+                        "MRT_TY_WE_NORTH_OTHER"
+                    ]
                 },
-                excludeStations: ["台北車站"]
+                excludeStations: ["台北車站"] // 終點站無法搭乘此方向
             },
             { 
+                // 南下 (往 A22 老街溪 / 機場)
+                // 對應爬蟲變數中的 SOUTH
                 id: "outbound", 
                 label: "往 機場 / 老街溪", 
                 sources: {
-                    weekday: ["MRT_DATA_AIRPORT_WD"], // 建議包含直達車與普通車
-                    weekend: ["MRT_DATA_AIRPORT_WE"]
+                    weekday: [
+                        "MRT_TY_WD_SOUTH_EXPRESS",          // 直達車
+                        "MRT_TY_WD_SOUTH_EXPRESS_PLUS",     // 尖峰增停直達車
+                        "MRT_TY_WD_SOUTH_COMMUTER",         // 普通車
+                        "MRT_TY_WD_SOUTH_COMMUTER_SKIP",    // 尖峰跳站普通車
+                        "MRT_TY_WD_SOUTH_AIRPORT_SERVICE",  // 機場加班車 (A1->A13)
+                        "MRT_TY_WD_SOUTH_OTHER"             // 其他
+                    ],
+                    weekend: [
+                        "MRT_TY_WE_SOUTH_EXPRESS",
+                        "MRT_TY_WE_SOUTH_EXPRESS_PLUS",
+                        "MRT_TY_WE_SOUTH_COMMUTER",
+                        "MRT_TY_WE_SOUTH_COMMUTER_SKIP",
+                        "MRT_TY_WE_SOUTH_AIRPORT_SERVICE",
+                        "MRT_TY_WE_SOUTH_OTHER"
+                    ]
                 },
-                excludeStations: ["老街溪"]
+                excludeStations: ["老街溪"] // 終點站無法搭乘此方向
             }
         ],
         stations: [
-            { name: "台北車站", id: "A1", lat: 25.0463, lon: 121.5175, branch: 'common' },
+            { name: "台北車站", id: "A1", lat: 25.0488, lon: 121.5134, branch: 'common' },
             { name: "三重", id: "A2", lat: 25.0558, lon: 121.4847, branch: 'common' },
             { name: "新北產業園區", id: "A3", lat: 25.0615, lon: 121.4599, branch: 'common' },
             { name: "新莊副都心", id: "A4", lat: 25.0594, lon: 121.4468, branch: 'common' },
@@ -373,5 +405,4 @@ let appState = {
     station: null,
     dirId: 'north', // 若切換到藍線記得要改為 'east' 或 'west'，或由程式自動判斷
     dayType: 'weekday'
-
 };
