@@ -11,7 +11,7 @@
     <script src="mrt_bl_data.js"></script>
     <script src="mrt_br_data.js"></script>
     <script src="mrt_y_data.js"></script>
-    <script src="mrt_t_data.js"></script>
+    <script src="mrt_ty_data.js"></script>
     
     <script src="config.js"></script>
     
@@ -291,9 +291,24 @@
         .time-status { font-weight: bold; font-size: 0.95rem; color: #555; }
         .status-urgent { color: var(--status-red); }
 
-        .dest-tag { font-size: 0.75rem; padding: 2px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; }
+        .dest-tag { font-size: 0.65rem; padding: 1px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; display: inline-block; cursor: default; }
+        
+        /* Orange Line Tags */
         .tag-huilong { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
         .tag-luzhou { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+        .tag-return { background: #7f8c8d; color: white; border: 1px solid #666; }
+
+        /* Airport MRT Tags */
+        .tag-clickable { cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .tag-clickable:hover { opacity: 0.8; }
+        
+        /* 修正與新增的車種顏色 */
+        .tag-ty-express { background: #8e44ad; color: white; border: 1px solid #9b59b6; } /* 直達車 (紫) */
+        .tag-ty-express-plus { background: #4a235a; color: #f1c40f; border: 1px solid #f1c40f; } /* 尖峰增停 (深紫+黃字) */
+        .tag-ty-commuter-skip { background: #e67e22; color: white; border: 1px solid #d35400; } /* 跳站普通 (橘) */
+        .tag-ty-airport { background: #16a085; color: white; border: 1px solid #1abc9c; } /* 往機場 (綠) */
+        .tag-ty-commuter { background: #2980b9; color: white; border: 1px solid #2980b9; } /* 普通車 (藍) - 新增此行 */
+        
         .empty-msg { padding: 40px; text-align: center; color: #aaa; }
 
         /* === Meme === */
@@ -353,6 +368,31 @@
             pointer-events: none;
         }
 
+        /* === Popup Modal for Stops === */
+        .modal-overlay {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); z-index: 3000;
+            justify-content: center; align-items: center;
+        }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.2s; }
+        .modal-card {
+            background: white; padding: 20px; border-radius: 12px;
+            width: 85%; max-width: 360px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            position: relative; transform: scale(0.95);
+            transition: transform 0.2s;
+        }
+        .modal-overlay.active .modal-card { transform: scale(1); }
+        .modal-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; color: #333; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .modal-body { font-size: 0.95rem; line-height: 1.6; color: #555; white-space: pre-line; }
+        .modal-close-btn {
+            margin-top: 15px; width: 100%; padding: 10px; background: #f0f0f0; border: none; border-radius: 8px; 
+            cursor: pointer; font-weight: bold; color: #555; transition: background 0.2s;
+        }
+        .modal-close-btn:active { background: #e0e0e0; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
     </style>
 </head>
 <body>
@@ -363,6 +403,14 @@
             <span id="tour-content"></span>
         </div>
         <div class="tour-tap-hint">點擊任意處繼續 (Tap anywhere to continue)</div>
+    </div>
+
+    <div class="modal-overlay" id="stops-modal" onclick="closeStopsModal(event)">
+        <div class="modal-card" onclick="event.stopPropagation()">
+            <div class="modal-title" id="modal-title">車種資訊</div>
+            <div class="modal-body" id="modal-content">...</div>
+            <button class="modal-close-btn" onclick="closeStopsModal()">關閉</button>
+        </div>
     </div>
 
     <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
@@ -380,7 +428,7 @@
         </div>
 
         <div class="menu-footer">
-            <span class="view-count-label">累積瀏覽次數</span>
+            <span class="view-count-label">瀏覽人次</span>
             <br>
             <span id="view-counter" class="counter-badge loading">...</span>
         </div>
@@ -414,6 +462,13 @@
     const MIN_LOADING_MS = 3000; 
     const AUTO_REFRESH_SEC = 60; 
 
+    // 機場捷運停靠站資訊 (已展開所有站名) 
+    const TY_STOPS_DATA = { "TY_EXP": "★ 直達車\n停靠站：\nA1 台北車站\nA3 新北產業園區\nA8 長庚醫院\nA12 機場第一航廈\nA13 機場第二航廈", 
+        "TY_EXP_P": "★ 尖峰增停直達車\n停靠站：\nA1 台北車站\nA3 新北產業園區\nA8 長庚醫院\nA12 機場第一航廈\nA13 機場第二航廈\nA18 高鐵桃園站\nA21 環北站", 
+        "TY_COM_S": "★ 尖峰跳站普通車\n停靠站：\nA21 環北站\nA18 高鐵桃園站\nA13 機場第二航廈\nA12 機場第一航廈\n(以下每站停靠)\nA9 林口站\nA8 長庚醫院\nA7 體育大學\nA6 泰山貴和\nA5 泰山站\nA4 新莊副都心\nA3 新北產業園區\nA2 三重站\nA1 台北車站", 
+        "TY_APT": "★ 機場加班車\n行駛區間 (沿途每站停靠)：\n往機場：A1 台北車站 ➔ A13 機場第二航廈\n往台北：A22 老街溪站 ➔ A12 機場第一航廈", 
+        "TY_COM": "● 普通車\n停靠站：\nA1 台北車站 至 A22 老街溪站\n(全線沿途每站停靠)" };
+
     const MENU_MAPPING = [
         { key: 'orange', label: '中和新蘆線' },
         { key: 'red',    label: '淡水信義線' },
@@ -421,7 +476,7 @@
         { key: 'green',  label: '松山新店線' },
         { key: 'brown',  label: '文湖線' },
         { key: 'yellow', label: '環狀線' },
-        { key: 'purple',label: '機場捷運' }
+        { key: 'purple', label: '機場捷運' }
     ];
 
     const LOADING_TEXTS = [
@@ -460,29 +515,23 @@
     };
 
     // ==========================================
-    // 瀏覽計數器 (改用 api.counterapi.dev)
+    // 瀏覽計數器
     // ==========================================
     function initViewCounter() {
         const counterEl = document.getElementById('view-counter');
-        
         let domain = window.location.hostname;
         if (domain === 'localhost' || domain === '127.0.0.1' || !domain) {
             domain = 'mrt_local_test_key_v2'; 
         } else {
             domain = domain.replace(/\./g, '_');
         }
-
         const namespace = domain; 
         const key = "visits_v1";
-
-        // 使用新的 API: counterapi.dev
-        // endpoint: /v1/{namespace}/{key}/up
         const apiUrl = `https://api.counterapi.dev/v1/${namespace}/${key}/up`;
         
         fetch(apiUrl)
             .then(response => response.json())
             .then(data => {
-                // 新 API 回傳結構是 { "count": 123 }
                 if (typeof data.count !== 'undefined') {
                     const formattedNum = data.count.toLocaleString();
                     counterEl.innerText = formattedNum;
@@ -712,6 +761,8 @@
     }
 
     function autoLocate(lat, lon) {
+        if (currentPriorityLevel === 99) return;
+
         let minD = Infinity;
         let bestName = "";
 
@@ -847,12 +898,35 @@
         if (!sources) { ul.innerHTML="<li>無資料設定</li>"; return; }
 
         let trains = [];
+        
+        // 1. 抓取資料並給予分類標籤 (Type)
         sources.forEach(varName => {
             if (window[varName] && window[varName][cardState.station.id]) {
                 const raw = window[varName][cardState.station.id].times;
-                let type = "N";
-                if (varName.includes("HUILONG")) type = "H";
-                if (varName.includes("LUZHOU")) type = "L";
+                
+                let type = "N"; // Default Normal
+                
+                // --- Orange Line Logic ---
+                if (cardState.lineKey === 'orange') {
+                    if (varName.includes("LUZHOU")) {
+                        type = varName.includes("RETURN") ? "L_RET" : "L";
+                    } else if (varName.includes("HUILONG")) {
+                        type = varName.includes("RETURN") ? "H_RET" : "H";
+                    } else if (varName.includes("NANSHIJIAO")) {
+                        type = "O_SOUTH"; 
+                    }
+                }
+                
+                // --- Airport MRT Logic (Purple) ---
+                else if (cardState.lineKey === 'purple') {
+                    if (varName.includes("EXPRESS_PLUS")) type = "TY_EXP_P";
+                    else if (varName.includes("EXPRESS")) type = "TY_EXP";
+                    else if (varName.includes("COMMUTER_SKIP")) type = "TY_COM_S";
+                    else if (varName.includes("AIRPORT_SERVICE")) type = "TY_APT";
+                    else if (varName.includes("COMMUTER")) type = "TY_COM";
+                    else type = "TY_COM"; 
+                }
+
                 raw.forEach(t => trains.push({ time: t, type }));
             }
         });
@@ -860,18 +934,8 @@
         if (trains.length === 0) { ul.innerHTML = "<li class='empty-msg'>未取得時刻</li>"; return; }
 
         const unique = new Map();
-        trains.forEach(t => unique.set(t.time, t));
+        trains.forEach(t => unique.set(t.time + "_" + t.type, t)); 
         const sorted = Array.from(unique.values()).sort((a,b)=>a.time - b.time);
-
-        if (cardState.lineKey === 'orange' && cardState.station.branch === 'common' && cardState.currentDir === 'north') {
-            if (sorted.length > 0) {
-                let cur = (sorted[0].type==='H'||sorted[0].type==='L') ? sorted[0].type : 'H';
-                sorted.forEach((t, i) => {
-                    if (i===0) t.type = cur;
-                    else t.type = (sorted[i-1].type === 'H') ? 'L' : 'H';
-                });
-            }
-        }
 
         const now = new Date();
         let nowMins = now.getHours() * 60 + now.getMinutes();
@@ -888,20 +952,78 @@
             let diff = item.time - nowMins;
             let status = (diff<=0) ? "進站中" : `約 ${diff} 分`;
             let isRed = (diff<=10 || diff<=0);
+            
+            // 2. 產生標籤 HTML
             let tag = "";
-            if (cardState.lineKey === 'orange' && cardState.station.branch === 'common' && cardState.currentDir === 'north') {
-                if(item.type==='H') tag = `<span class="dest-tag tag-huilong">往迴龍</span>`;
-                else if(item.type==='L') tag = `<span class="dest-tag tag-luzhou">往蘆洲</span>`;
+            
+            // 橘線標籤 (修改處：增加支線判斷)
+            if (cardState.lineKey === 'orange') {
+                // 判斷當前車站是否位於支線
+                const isHuilongBranch = (cardState.station.branch === 'huilong');
+                const isLuzhouBranch = (cardState.station.branch === 'luzhou');
+
+                // 邏輯：
+                // 1. 如果車是「往迴龍」(H)，但人已經在「迴龍支線」(isHuilongBranch) 上，則不顯示標籤。
+                // 2. 如果車是「往蘆洲」(L)，但人已經在「蘆洲支線」(isLuzhouBranch) 上，則不顯示標籤。
+                
+                if (item.type === 'H' && !isHuilongBranch) {
+                    tag = `<span class="dest-tag tag-huilong">往迴龍</span>`;
+                } 
+                else if (item.type === 'L' && !isLuzhouBranch) {
+                    tag = `<span class="dest-tag tag-luzhou">往蘆洲</span>`;
+                } 
+                else if (item.type === 'H_RET') {
+                    tag = `<span class="dest-tag tag-return">迴龍回籠</span>`;
+                } 
+                else if (item.type === 'L_RET') {
+                    tag = `<span class="dest-tag tag-return">蘆洲回籠</span>`;
+                }
+            } 
+            // 機場捷運互動標籤
+            else if (cardState.lineKey === 'purple') {
+                if (item.type === 'TY_EXP') tag = `<span class="dest-tag tag-ty-express tag-clickable" onclick="openStopsModal('TY_EXP')">直達車</span>`;
+                else if (item.type === 'TY_EXP_P') tag = `<span class="dest-tag tag-ty-express-plus tag-clickable" onclick="openStopsModal('TY_EXP_P')">尖峰增停直達車</span>`;
+                else if (item.type === 'TY_COM_S') tag = `<span class="dest-tag tag-ty-commuter-skip tag-clickable" onclick="openStopsModal('TY_COM_S')">尖峰跳站普通車</span>`;
+                else if (item.type === 'TY_APT') tag = `<span class="dest-tag tag-ty-airport tag-clickable" onclick="openStopsModal('TY_APT')">往機場</span>`;
+                else if (item.type === 'TY_COM') tag = `<span class="dest-tag tag-ty-commuter tag-clickable" onclick="openStopsModal('TY_COM')">普通車</span>`;
             }
+
+            let estimateText = "";
+            if (cardState.lineKey === 'brown') {
+                estimateText = `<span style="font-size: 0.75rem; color: #999; margin-left: 6px; font-weight: normal;">(預估時間)</span>`;
+            }
+
             const li = document.createElement('li');
             li.className = 'time-item';
-            li.innerHTML = `<div><span class="time-val">${timeStr}</span>${tag}</div><span class="time-status ${isRed ? 'status-urgent' : ''}">${status}</span>`;
+            li.innerHTML = `<div><span class="time-val">${timeStr}</span>${estimateText}${tag}</div><span class="time-status ${isRed ? 'status-urgent' : ''}">${status}</span>`;
             ul.appendChild(li);
         });
     }
 
     // ==========================================
-    // 6. 新手引導邏輯
+    // 6. Modal 功能
+    // ==========================================
+    window.openStopsModal = function(type) {
+        const info = TY_STOPS_DATA[type];
+        if (info) {
+            // 分離標題與內容 (假設格式第一行為標題)
+            const parts = info.split('\n');
+            const title = parts[0].replace(/★|●/g, '').trim();
+            const body = parts.slice(1).join('\n');
+
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-content').innerText = body;
+            document.getElementById('stops-modal').classList.add('active');
+        }
+    };
+
+    window.closeStopsModal = function(e) {
+        if (e) e.stopPropagation(); // 防止點擊內容時關閉
+        document.getElementById('stops-modal').classList.remove('active');
+    };
+
+    // ==========================================
+    // 7. 新手引導邏輯
     // ==========================================
     let currentTourStep = 0;
     const TOUR_STEPS = [
@@ -991,7 +1113,7 @@
 
     function initGlobalClickListener() {
         document.addEventListener('click', (e) => {
-            if (e.target.closest('.header') || e.target.closest('.station-info-bar') || e.target.closest('.side-menu') || e.target.closest('.menu-backdrop') || e.target.closest('.tour-overlay')) return;
+            if (e.target.closest('.header') || e.target.closest('.station-info-bar') || e.target.closest('.side-menu') || e.target.closest('.menu-backdrop') || e.target.closest('.tour-overlay') || e.target.closest('.modal-overlay')) return;
             const cards = Array.from(document.querySelectorAll('.line-card'));
             if (cards.length === 0) return;
             const screenCenterX = window.innerWidth / 2;
@@ -1006,8 +1128,12 @@
             const btnContainer = closestCard.querySelector('.direction-buttons');
             if (btnContainer && e.clientY <= btnContainer.getBoundingClientRect().bottom) return;
             const currentIndex = cards.indexOf(closestCard);
-            if (e.clientX < window.innerWidth / 3 && currentIndex > 0) cards[currentIndex - 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-            else if (e.clientX > (window.innerWidth / 3 * 2) && currentIndex < cards.length - 1) cards[currentIndex + 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            if (e.clientX < window.innerWidth / 4 && currentIndex > 0) {
+                cards[currentIndex - 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            } 
+            else if (e.clientX > (window.innerWidth * 3 / 4) && currentIndex < cards.length - 1) {
+                cards[currentIndex + 1].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+            }
         });
     }
 
