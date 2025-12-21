@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Scholar: Stable</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #0f172a;
+            --border: #e2e8f0;
+            --highlight-bg: #dbeafe;
+            --font-size: 16px;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', "Microsoft JhengHei", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* === 導航列 === */
+        .navbar {
+            background: var(--card);
+            padding: 0 15px;
+            height: 50px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .brand { 
+            width: 250px;
+            font-weight: bold; color: var(--primary); font-size: 1.1rem; 
+            display: flex; align-items: center; gap: 8px;
+        }
+
+        .tabs { 
+            flex: 1;
+            display: flex; 
+            justify-content: center;
+            gap: 5px; 
+            height: 100%; 
+        }
+
+        .tab-btn {
+            padding: 0 20px; border: none; background: transparent; font-weight: 600; color: #64748b;
+            cursor: pointer; height: 100%; border-bottom: 3px solid transparent; font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: #eff6ff; }
+        .tab-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .controls { 
+            width: 320px;
+            display: flex; 
+            justify-content: flex-end; 
+            align-items: center; 
+            gap: 12px; 
+            font-size: 0.8rem; 
+        }
+
+        .btn-icon {
+            background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; 
+            padding: 5px 10px; cursor: pointer; color: #64748b; font-size: 0.8rem;
+            display: flex; align-items: center; gap: 5px;
+        }
+        .btn-icon:hover { background: #e2e8f0; color: #334155; }
+        
+        #globalClearBtn { display: none; color: #ef4444; border-color: #fecaca; background: #fef2f2; }
+        #globalClearBtn:hover { background: #fee2e2; }
+
+        .rec-indicator { color: #ef4444; font-weight: bold; opacity: 0; display: flex; align-items: center; gap: 5px; transition: opacity 0.3s; }
+        .rec-indicator.active { opacity: 1; }
+        .rec-dot { width: 8px; height: 8px; background: currentColor; border-radius: 50%; animation: pulse 1s infinite; }
+        @keyframes pulse { 50% { opacity: 0.4; } }
+
+        /* 主畫面 */
+        .main-container { flex: 1; padding: 15px; position: relative; overflow: hidden; }
+        .page { display: none; width: 100%; height: 100%; flex-direction: column; gap: 15px; animation: fadeIn 0.3s; }
+        .page.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        /* 卡片 */
+        .card { background: var(--card); border-radius: 8px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+        /* === 1. 設定頁 === */
+        .settings-layout { display: grid; grid-template-columns: 280px 1fr 1fr; gap: 15px; height: 100%; }
+        .col-config { padding: 20px; display: flex; flex-direction: column; gap: 15px; background: #fff; }
+        .col-preview { background: #e2e8f0; display: flex; align-items: center; justify-content: center; position: relative; }
+        .col-notes { display: flex; flex-direction: column; background: #fff; }
+
+        .input-group label { display: block; font-size: 0.85rem; font-weight: bold; color: #475569; margin-bottom: 5px; }
+        input[type="text"], input[type="password"], input[type="file"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.9rem; }
+
+        .btn { width: 100%; padding: 10px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; color: white; margin-top: 5px; transition: background 0.3s; }
+        .btn-primary { background: var(--primary); }
+        .btn-primary:hover { background: #1d4ed8; }
+        .btn-success { background: #10b981; margin-top: auto; display: none; }
+        
+        #pdfFrame { width: 100%; height: 100%; border: none; display: none; }
+        .notes-editor { flex: 1; width: 100%; border: none; padding: 15px; resize: none; font-family: "Microsoft JhengHei", monospace; font-size: 0.95rem; line-height: 1.6; outline: none; background: #fffbeb; }
+        .notes-header { padding: 10px 15px; background: #f1f5f9; border-bottom: 1px solid var(--border); font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; }
+
+        /* === 2. Live 演講 === */
+        .live-layout { display: flex; flex-direction: column; height: 100%; gap: 10px; }
+        .article-zone { flex: 1; display: flex; flex-direction: column; }
+        .article-split { flex: 1; display: flex; overflow: hidden; }
+        .split-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .split-col.left { border-right: 1px solid var(--border); }
+        
+        .col-header { 
+            padding: 8px 15px; background: #f8fafc; font-weight: bold; font-size: 0.9rem; color: #64748b; 
+            border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;
+        }
+        .col-content { flex: 1; padding: 20px; overflow-y: auto; font-size: var(--font-size); line-height: 1.8; white-space: pre-wrap; }
+        
+        .stream-zone { height: 150px; position: relative; }
+        .stream-scroll { padding: 10px; overflow-y: auto; height: 100%; display: flex; flex-direction: column; gap: 5px; }
+        .bubble { padding: 6px 10px; color: #94a3b8; font-size: 0.9rem; }
+        .bubble.current { background: var(--highlight-bg); color: #1e293b; font-weight: 500; border-left: 3px solid var(--primary); }
+
+        /* === 3. Q&A === */
+        .qa-layout { display: grid; grid-template-rows: auto 1fr; gap: 15px; height: 100%; }
+        .question-box { padding: 15px; background: #fffbeb; border: 1px solid #fcd34d; position: relative;}
+        .q-en { font-size: 1.2rem; font-weight: bold; color: #92400e; margin-bottom: 5px; }
+        .q-cn { color: #b45309; }
+        .qa-controls { position: absolute; top: 15px; right: 15px; }
+        
+        .btn-qa-toggle {
+            background: #ef4444; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.85rem; 
+            cursor: pointer; border: none; display: flex; align-items: center; gap: 5px;
+        }
+        .btn-qa-toggle.paused { background: #64748b; }
+
+        .answers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; min-height: 0; }
+        .ans-card { border: 1px solid transparent; display: flex; flex-direction: column; }
+        .ans-header { padding: 8px 15px; color: white; font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .ans-body { flex: 1; padding: 15px; overflow-y: auto; font-size: var(--font-size); white-space: pre-wrap; line-height: 1.6; background: white; }
+        
+        .card-fast { border-color: #6ee7b7; }
+        .card-fast .ans-header { background: #059669; }
+        .card-pro { border-color: #a78bfa; }
+        .card-pro .ans-header { background: #7c3aed; }
+
+        /* 模型標籤 */
+        .model-tag { 
+            font-size: 0.7rem; background: rgba(0,0,0,0.1); padding: 2px 6px; border-radius: 4px; color: inherit; 
+            font-family: monospace; font-weight: normal; opacity: 0.8;
+        }
+        .text-dark .model-tag { color: #64748b; background: #e2e8f0; }
+
+        .typing { color: #888; font-style: italic; }
+        .error-msg { color: #dc2626; font-weight: bold; }
+
+    </style>
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="brand"><i class="fas fa-shield-alt"></i> The Savior V1 </div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('settings')">1. 配置與筆記</button>
+            <button class="tab-btn" id="nav-live" onclick="switchTab('live')" disabled>2. 即時演講</button>
+            <button class="tab-btn" id="nav-qa" onclick="switchTab('qa')" disabled>3. Q&A 應答</button>
+        </div>
+
+        <div class="controls">
+            <button id="globalClearBtn" class="btn-icon" onclick="clearLiveContent()" title="清除對話紀錄">
+                <i class="fas fa-trash-alt"></i> 清除對話
+            </button>
+
+            <div class="rec-indicator" id="recStatus"><div class="rec-dot"></div> REC</div>
+            
+            <input type="range" min="14" max="24" value="16" oninput="changeFontSize(this.value)" title="字體大小">
+        </div>
+    </nav>
+
+    <div class="main-container">
+
+        <div id="settings" class="page active">
+            <div class="card settings-layout">
+                <div class="col-config">
+                    <h3>系統配置</h3>
+                    <div class="input-group">
+                        <label>Gemini API Key</label>
+                        <input type="password" id="apiKey" placeholder="貼上 Key">
+                    </div>
+                    <div class="input-group">
+                        <label>論文 PDF</label>
+                        <input type="file" id="pdfUpload" accept="application/pdf" onchange="previewPDF(this)">
+                    </div>
+                    
+                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: -10px; display: flex; align-items: center; gap: 5px;">
+                        <i class="fas fa-microchip"></i> 準備模型: 
+                        <span class="model-tag text-dark" id="badge-settings">Pending...</span>
+                    </div>
+
+                    <button class="btn btn-primary" id="initBtn" onclick="initSystem()">生成筆記</button>
+                    <div id="initStatus" style="font-size:0.8rem; color:#666; min-height: 20px;"></div>
+                    <button class="btn btn-success" id="goLiveBtn" onclick="switchTab('live')">
+                        開始演講 <i class="fas fa-play"></i>
+                    </button>
+                </div>
+
+                <div class="col-preview">
+                    <iframe id="pdfFrame"></iframe>
+                    <div id="previewText" style="color:#64748b;">PDF 預覽區域</div>
+                </div>
+
+                <div class="col-notes">
+                    <div class="notes-header">
+                        <span><i class="fas fa-edit"></i> 演講筆記 (可修改)</span>
+                    </div>
+                    <textarea id="editableNotes" class="notes-editor" placeholder="生成的筆記會出現在這裡，請務必確認內容..."></textarea>
+                </div>
+            </div>
+        </div>
+
+        <div id="live" class="page">
+            <div class="live-layout">
+                <div class="card article-zone">
+                    <div class="article-split">
+                        <div class="split-col left">
+                            <div class="col-header">
+                                <span>English (Auto-Organized)</span>
+                                <span class="model-tag text-dark" id="badge-live-article">...</span>
+                            </div>
+                            <div class="col-content" id="liveEn"></div>
+                        </div>
+                        <div class="split-col">
+                            <div class="col-header">
+                                <span>中文 (Translation)</span>
+                            </div>
+                            <div class="col-content" id="liveCn"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card stream-zone">
+                    <div style="position: absolute; top: 10px; right: 10px; z-index: 10;">
+                        <span class="model-tag text-dark" id="badge-live-stream">Listening...</span>
+                    </div>
+                    <div class="stream-scroll" id="streamArea"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="qa" class="page">
+            <div class="qa-layout">
+                <div class="card question-box">
+                    <div class="q-en" id="qEn">Waiting for question...</div>
+                    <div class="q-cn" id="qCn">請切換至此頁面並聆聽提問</div>
+                    <div class="qa-controls">
+                        <button id="qaRecBtn" class="btn-qa-toggle" onclick="toggleQARecording()">
+                            <i class="fas fa-stop"></i> 暫停錄音 (我回答時)
+                        </button>
+                    </div>
+                </div>
+                <div class="answers-grid">
+                    <div class="card ans-card card-fast">
+                        <div class="ans-header">
+                            <span>Flash 回應</span>
+                            <span class="model-tag" id="badge-qa-flash">...</span>
+                        </div>
+                        <div class="ans-body" id="ansFast"></div>
+                    </div>
+                    <div class="card ans-card card-pro">
+                        <div class="ans-header">
+                            <span>Pro 回應</span>
+                            <span class="model-tag" id="badge-qa-pro">...</span>
+                        </div>
+                        <div class="ans-body" id="ansPro"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+
+        // === 模型優先序 (Fixed) ===
+        const MODEL_PRIORITY = [
+            "gemini-3-flash-preview",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite",                   
+            "gemini-2.5-flash-lite-preview-09-2025",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-preview-image-generation",
+        ];
+        const FLASH_START_INDEX = 2; 
+
+        let genAI;
+        let currentModelIndex = 0; 
+        
+        let recognition;
+        let isRecording = false; 
+        let isQAPaused = false;  
+        
+        let currentTab = 'settings';
+        let sentenceBuffer = [];
+        const BUFFER_SIZE = 3; 
+
+        let accumulatedRawSpeech = ""; 
+
+        // === 核心：故障轉移生成函式 (Debug版) ===
+        async function generateSafe(prompt, isFlashTask = false) {
+            let attemptIndex = isFlashTask ? Math.max(currentModelIndex, FLASH_START_INDEX) : currentModelIndex;
+
+            while (attemptIndex < MODEL_PRIORITY.length) {
+                const modelName = MODEL_PRIORITY[attemptIndex];
+                
+                try {
+                    console.log(`Trying model: ${modelName}`);
+                    const model = genAI.getGenerativeModel({ model: modelName });
+                    const result = await model.generateContent(prompt);
+                    
+                    return { response: result.response, modelName: modelName.replace('gemini-', '') };
+
+                } catch (e) {
+                    console.warn(`[Failover] Model ${modelName} failed:`, e.message);
+                    if (attemptIndex === currentModelIndex) {
+                        currentModelIndex++;
+                    }
+                    attemptIndex++; 
+                }
+            }
+            throw new Error("All backup models failed. Check console (F12) for details.");
+        }
+
+        // Utils
+        function getEffectiveContext() {
+            return document.getElementById('editableNotes').value || "無背景資料";
+        }
+
+        window.previewPDF = (input) => {
+            if (input.files[0]) {
+                const url = URL.createObjectURL(input.files[0]);
+                const frame = document.getElementById('pdfFrame');
+                frame.src = url; frame.style.display = 'block';
+                document.getElementById('previewText').style.display = 'none';
+            }
+        };
+
+        window.clearLiveContent = () => {
+            if(confirm("確定要清除目前整理好的演講內容嗎？")) {
+                document.getElementById('liveEn').innerHTML = "";
+                document.getElementById('liveCn').innerHTML = "";
+                document.getElementById('streamArea').innerHTML = "";
+                accumulatedRawSpeech = "";
+                sentenceBuffer = [];
+            }
+        }
+
+        window.toggleQARecording = () => {
+            const btn = document.getElementById('qaRecBtn');
+            if (isQAPaused) {
+                isQAPaused = false;
+                if (!isRecording) recognition.start();
+                btn.innerHTML = `<i class="fas fa-stop"></i> 暫停錄音 (我回答時)`;
+                btn.classList.remove('paused');
+            } else {
+                isQAPaused = true;
+                recognition.stop();
+                btn.innerHTML = `<i class="fas fa-microphone"></i> 繼續錄音 (聽問題)`;
+                btn.classList.add('paused');
+            }
+        }
+
+        // 2. 初始化
+        window.initSystem = async () => {
+            const key = document.getElementById('apiKey').value;
+            const file = document.getElementById('pdfUpload').files[0];
+            const manualNotes = document.getElementById('editableNotes').value.trim();
+            const btn = document.getElementById('initBtn');
+            const status = document.getElementById('initStatus');
+            const badge = document.getElementById('badge-settings');
+
+            if(!key) return alert("請輸入 API Key");
+            if(!file && !manualNotes) return alert("請選擇 PDF 或輸入筆記");
+
+            btn.disabled = true;
+            status.innerText = "系統初始化中...";
+
+            try {
+                genAI = new GoogleGenerativeAI(key);
+
+                // 顯示預設模型
+                badge.innerText = MODEL_PRIORITY[currentModelIndex].replace('gemini-', '');
+
+                if (file) {
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    reader.onload = async () => {
+                        const base64 = reader.result.split(',')[1];
+                        const prompt = `閱讀這份論文，請用「繁體中文」生成一份演講用的重點筆記。包含：關鍵術語、核心貢獻、實驗結論。`;
+                        try {
+                            const { response, modelName } = await generateSafe([prompt, { inlineData: { data: base64, mimeType: "application/pdf" }}], false);
+                            
+                            document.getElementById('editableNotes').value = response.text();
+                            badge.innerText = modelName;
+                            
+                            finishSetup(`初始化完成！`);
+                        } catch (err) { throw err; }
+                    };
+                } else {
+                    finishSetup("已啟用手動筆記模式");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("初始化失敗: " + e.message);
+                status.innerText = "所有模型皆無法回應 (請按 F12 看 Console)";
+                btn.disabled = false;
+            }
+
+            function finishSetup(msg) {
+                status.innerText = msg;
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fas fa-sync-alt"></i> 重新生成筆記`;
+                document.getElementById('nav-live').disabled = false;
+                document.getElementById('nav-qa').disabled = false;
+                document.getElementById('goLiveBtn').style.display = 'block';
+            }
+        };
+
+        // 3. 語音
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US'; 
+
+            recognition.onstart = () => {
+                isRecording = true;
+                document.getElementById('recStatus').classList.add('active');
+            };
+            recognition.onend = () => {
+                isRecording = false;
+                document.getElementById('recStatus').classList.remove('active');
+                if (currentTab === 'live') recognition.start();
+                if (currentTab === 'qa' && !isQAPaused) recognition.start();
+            };
+            recognition.onresult = (e) => {
+                if (e.results[e.resultIndex].isFinal) {
+                    processSpeech(e.results[e.resultIndex][0].transcript);
+                }
+            };
+        }
+
+        function processSpeech(text) {
+            if (currentTab === 'live') {
+                updateStream(text);
+                processArticle(text);
+            } else if (currentTab === 'qa') {
+                triggerQA(text);
+            }
+        }
+
+        // 4. Live 邏輯 (Prompt 修正)
+        function updateStream(text) {
+            const area = document.getElementById('streamArea');
+            const old = area.querySelector('.current');
+            if(old) old.classList.remove('current');
+            
+            const div = document.createElement('div');
+            div.className = 'bubble current';
+            div.innerText = text;
+            area.appendChild(div);
+            area.scrollTop = area.scrollHeight;
+            
+            document.getElementById('badge-live-stream').innerText = "WebSpeech Active";
+        }
+
+        async function processArticle(text) {
+            sentenceBuffer.push(text);
+            accumulatedRawSpeech += text + " ";
+
+            if (sentenceBuffer.length >= BUFFER_SIZE) {
+                sentenceBuffer = []; 
+                const effectiveSpeech = accumulatedRawSpeech.length > 5000 
+                    ? "..." + accumulatedRawSpeech.slice(-5000) : accumulatedRawSpeech;
+
+                // === 修正：強力要求不准加料 ===
+                const prompt = `
+                Context (Notes): ${getEffectiveContext().substring(0,2000)}...
+                Full Speech Transcript: "${effectiveSpeech}"
+                
+                Task: Clean up grammar and merge fragments into complete sentences.
+                Constraints: 
+                1. STRICTLY Verbatim. Do NOT add new information or ideas. 
+                2. Do NOT summarize. Do NOT write an intro or conclusion.
+                3. Just fix the English.
+                4. Then translate exactly to Traditional Chinese.
+                
+                Output JSON: { "en": "Cleaned English...", "cn": "中文翻譯..." }
+                `;
+
+                try {
+                    const { response, modelName } = await generateSafe(prompt, true);
+                    const cleanText = response.text().replace(/```json|```/g, '').trim();
+                    const json = JSON.parse(cleanText);
+
+                    document.getElementById('liveEn').innerText = json.en;
+                    document.getElementById('liveCn').innerText = json.cn;
+                    
+                    document.getElementById('badge-live-article').innerText = modelName;
+                    document.getElementById('badge-live-stream').innerText = `Processed by ${modelName}`;
+
+                    const enDiv = document.getElementById('liveEn'); enDiv.scrollTop = enDiv.scrollHeight;
+                    const cnDiv = document.getElementById('liveCn'); cnDiv.scrollTop = cnDiv.scrollHeight;
+
+                } catch(e) { console.error("Live processing error:", e); }
+            }
+        }
+
+        // 5. Q&A
+        function triggerQA(question) {
+            document.getElementById('qEn').innerText = question;
+            document.getElementById('qCn').innerText = "...";
+            const boxFast = document.getElementById('ansFast');
+            const boxPro = document.getElementById('ansPro');
+            
+            boxFast.innerHTML = `<span class="typing">Generating...</span>`;
+            boxPro.innerHTML = `<span class="typing">Thinking...</span>`;
+
+            const context = getEffectiveContext();
+            const instruction = `Task: Translate question to Chinese. Provide CONCISE answer (English & Chinese). Format: [EN]... [CN]...`;
+
+            // Flash Track
+            generateSafe(`Context: ${context}\nQuestion: ${question}\n${instruction}`, true)
+            .then(({response, modelName}) => { 
+                boxFast.innerText = response.text(); 
+                document.getElementById('badge-qa-flash').innerText = modelName;
+            })
+            .catch(err => { boxFast.innerHTML = `<span class="error-msg">${err.message}</span>`; });
+
+            // Pro Track
+            const proPrompt = `Context: ${context}\nQuestion: ${question}\nInstruction: Think deeply but answer CONCISELY.`;
+            generateSafe(proPrompt, false)
+            .then(({response, modelName}) => { 
+                boxPro.innerText = response.text(); 
+                document.getElementById('badge-qa-pro').innerText = modelName;
+            })
+            .catch(err => { boxPro.innerHTML = `<span class="error-msg">${err.message}</span>`; });
+        }
+
+        // UI Utils
+        window.switchTab = (tab) => {
+            currentTab = tab;
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tab).classList.add('active');
+            
+            if (tab === 'live') {
+                document.getElementById('globalClearBtn').style.display = 'flex';
+            } else {
+                document.getElementById('globalClearBtn').style.display = 'none';
+            }
+            
+            if(tab === 'settings') document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            if(tab === 'live') document.getElementById('nav-live').classList.add('active');
+            if(tab === 'qa') document.getElementById('nav-qa').classList.add('active');
+
+            if (tab === 'live') {
+                if(!isRecording) recognition.start();
+            } else if (tab === 'qa') {
+                isQAPaused = false;
+                const btn = document.getElementById('qaRecBtn');
+                btn.innerHTML = `<i class="fas fa-stop"></i> 暫停錄音 (我回答時)`;
+                btn.classList.remove('paused');
+                if(!isRecording) recognition.start();
+            } else {
+                recognition.stop();
+            }
+        };
+
+        window.changeFontSize = (val) => {
+            document.documentElement.style.setProperty('--font-size', val + 'px');
+        };
+    </script>
+</body>
+</html>
